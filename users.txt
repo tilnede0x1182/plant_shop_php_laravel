@@ -1,0 +1,21 @@
+=== ADMINS ===
+admin1@planteshop.com password
+admin2@planteshop.com password
+admin3@planteshop.com password
+
+=== USERS ===
+zpruvost@example.org password
+xbertrand@example.com password
+ulebreton@example.com password
+francois.gerard@example.com password
+pnguyen@example.org password
+slecoq@example.org password
+marcel.letellier@example.org password
+marc.leblanc@example.org password
+anne.robert@example.net password
+elise.bouchet@example.net password
+jules.gerard@example.org password
+louise.mendes@example.net password
+arthur.gros@example.net password
+neveu.caroline@example.net password
+vallet.julie@example.org password
