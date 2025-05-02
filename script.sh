@@ -1,99 +1,167 @@
-# 3 – Modèles + migrations ─────────────────────────────────────────
-php artisan make:model Plant      -m
-php artisan make:model Order      -m
-php artisan make:model OrderItem  -m
-php artisan make:migration add_admin_and_name_to_users --table=users
+#!/bin/bash
 
-# ── ./database/migrations/*create_plants_table.php
-cat > $(ls database/migrations/*create_plants_table.php) <<'PHP'
+mkdir -p app/Http/Controllers/Admin
+
+# app/Http/Controllers/UsersController.php
+cat > app/Http/Controllers/UsersController.php <<'EOF'
 <?php
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration{
-    public function up(){
-        Schema::create('plants',function(Blueprint $t){
-            $t->id();
-            $t->string('name');
-            $t->integer('price');
-            $t->text('description')->nullable();
-            $t->integer('stock');
-            $t->timestamps();
-        });
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\User;
+
+class UsersController extends Controller
+{
+    public function show(User $user) {
+        abort_unless(Auth::id() === $user->id, 403);
+        return view('users.show', compact('user'));
     }
-    public function down(){ Schema::dropIfExists('plants'); }
-};
-PHP
-# WHY: reproduit table plants de Rails.
 
-# ── ./database/migrations/*create_orders_table.php
-cat > $(ls database/migrations/*create_orders_table.php) <<'PHP'
+    public function edit(User $user) {
+        abort_unless(Auth::id() === $user->id, 403);
+        return view('users.edit', compact('user'));
+    }
+
+    public function update(Request $request, User $user) {
+        abort_unless(Auth::id() === $user->id, 403);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email',
+        ]);
+
+        $user->update($data);
+
+        return redirect()->route('users.show', $user)->with('success', 'Profil mis à jour.');
+    }
+}
+EOF
+
+# app/Http/Controllers/OrdersController.php
+cat > app/Http/Controllers/OrdersController.php <<'EOF'
 <?php
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration{
-    public function up(){
-        Schema::create('orders',function(Blueprint $t){
-            $t->id();
-            $t->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $t->integer('total_price')->default(0);
-            $t->string('status');
-            $t->timestamps();
-        });
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Plant;
+use Illuminate\Support\Facades\DB;
+
+class OrdersController extends Controller
+{
+    public function index() {
+        $orders = Auth::user()->orders()->with('orderItems.plant')->get();
+        return view('orders.index', compact('orders'));
     }
-    public function down(){ Schema::dropIfExists('orders'); }
-};
-PHP
-# WHY: idem table orders.
 
-# ── ./database/migrations/*create_order_items_table.php
-cat > $(ls database/migrations/*create_order_item*s_table.php) <<'PHP'
+    public function create() {
+        return view('orders.new');
+    }
+
+    public function store(Request $request) {
+        $items = json_decode($request->input('order.items'), true);
+        $total = 0;
+
+        try {
+            DB::beginTransaction();
+
+            $order = Order::create([
+                'user_id' => Auth::id(),
+                'status' => 'confirmed',
+                'total_price' => 0,
+            ]);
+
+            foreach ($items as $item) {
+                $plant = Plant::findOrFail($item['plant_id']);
+                $qty = intval($item['quantity']);
+
+                if ($plant->stock < $qty) {
+                    throw new \Exception("Stock insuffisant pour {$plant->name}");
+                }
+
+                $plant->decrement('stock', $qty);
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'plant_id' => $plant->id,
+                    'quantity' => $qty,
+                ]);
+
+                $total += $plant->price * $qty;
+            }
+
+            $order->update(['total_price' => $total]);
+
+            DB::commit();
+            return redirect()->route('orders.index')->with('success', 'Commande confirmée.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->route('orders.create')->with('error', $e->getMessage());
+        }
+    }
+}
+EOF
+
+# app/Http/Controllers/Admin/UsersController.php
+cat > app/Http/Controllers/Admin/UsersController.php <<'EOF'
 <?php
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration{
-    public function up(){
-        Schema::create('order_items',function(Blueprint $t){
-            $t->id();
-            $t->foreignId('order_id')->constrained()->cascadeOnDelete();
-            $t->foreignId('plant_id')->constrained()->cascadeOnDelete();
-            $t->integer('quantity');
-            $t->timestamps();
-        });
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
+
+class UsersController extends Controller
+{
+    public function index() {
+        $users = User::orderBy('admin', 'desc')->get();
+        return view('admin.users.index', compact('users'));
     }
-    public function down(){ Schema::dropIfExists('order_items'); }
-};
-PHP
-# WHY: idem table order_items.
 
-# ── ./database/migrations/*add_admin_and_name_to_users.php
-cat > $(ls database/migrations/*add_admin_and_name_to_users.php) <<'PHP'
+    public function show(User $user) {
+        return view('admin.users.show', compact('user'));
+    }
+
+    public function edit(User $user) {
+        return view('admin.users.edit', compact('user'));
+    }
+
+    public function update(Request $request, User $user) {
+        $data = $request->validate([
+            'name' => 'required|string',
+            'email' => 'required|email',
+            'admin' => 'boolean',
+        ]);
+
+        $user->update($data);
+        return redirect()->route('admin.users.index')->with('success', 'Utilisateur mis à jour.');
+    }
+
+    public function destroy(User $user) {
+        $user->delete();
+        return redirect()->route('admin.users.index')->with('success', 'Utilisateur supprimé.');
+    }
+}
+EOF
+
+# app/Http/Controllers/Controller.php (ApplicationController)
+cat > app/Http/Controllers/Controller.php <<'EOF'
 <?php
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration{
-    public function up(){
-        Schema::table('users',function(Blueprint $t){
-            $t->boolean('admin')->default(false);
-            $t->string('name')->nullable();
-        });
-    }
-    public function down(){
-        Schema::table('users',function(Blueprint $t){
-            $t->dropColumn(['admin','name']);
-        });
-    }
-};
-PHP
-# WHY: ajoute colonnes admin & name équivalentes à Rails.
+namespace App\Http\Controllers;
 
-# 4 – Migration BD ─────────────────────────────────────────────────
-php artisan migrate --quiet
-echo "✅ Schéma PostgreSQL créé."
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Foundation\Bus\DispatchesJobs;
+use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Routing\Controller as BaseController;
+
+class Controller extends BaseController
+{
+    use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
+}
+EOF
