@@ -1,167 +1,94 @@
 #!/bin/bash
+set -e
 
-mkdir -p app/Http/Controllers/Admin
+mkdir -p resources/views/admin/plants
+mkdir -p resources/views/admin/users
+mkdir -p resources/views/orders
+mkdir -p resources/views/users
 
-# app/Http/Controllers/UsersController.php
-cat > app/Http/Controllers/UsersController.php <<'EOF'
-<?php
-
-namespace App\Http\Controllers;
-
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use App\Models\User;
-
-class UsersController extends Controller
-{
-    public function show(User $user) {
-        abort_unless(Auth::id() === $user->id, 403);
-        return view('users.show', compact('user'));
-    }
-
-    public function edit(User $user) {
-        abort_unless(Auth::id() === $user->id, 403);
-        return view('users.edit', compact('user'));
-    }
-
-    public function update(Request $request, User $user) {
-        abort_unless(Auth::id() === $user->id, 403);
-
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email',
-        ]);
-
-        $user->update($data);
-
-        return redirect()->route('users.show', $user)->with('success', 'Profil mis à jour.');
-    }
-}
+# Admin › Plantes : create & edit
+cat > resources/views/admin/plants/create.blade.php <<'EOF'
+@extends('layouts.app')
+@section('content')
+<h1>Nouvelle plante</h1>
+@include('admin.plants._form', ['plant' => null])
+@endsection
 EOF
 
-# app/Http/Controllers/OrdersController.php
-cat > app/Http/Controllers/OrdersController.php <<'EOF'
-<?php
-
-namespace App\Http\Controllers;
-
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Plant;
-use Illuminate\Support\Facades\DB;
-
-class OrdersController extends Controller
-{
-    public function index() {
-        $orders = Auth::user()->orders()->with('orderItems.plant')->get();
-        return view('orders.index', compact('orders'));
-    }
-
-    public function create() {
-        return view('orders.new');
-    }
-
-    public function store(Request $request) {
-        $items = json_decode($request->input('order.items'), true);
-        $total = 0;
-
-        try {
-            DB::beginTransaction();
-
-            $order = Order::create([
-                'user_id' => Auth::id(),
-                'status' => 'confirmed',
-                'total_price' => 0,
-            ]);
-
-            foreach ($items as $item) {
-                $plant = Plant::findOrFail($item['plant_id']);
-                $qty = intval($item['quantity']);
-
-                if ($plant->stock < $qty) {
-                    throw new \Exception("Stock insuffisant pour {$plant->name}");
-                }
-
-                $plant->decrement('stock', $qty);
-                OrderItem::create([
-                    'order_id' => $order->id,
-                    'plant_id' => $plant->id,
-                    'quantity' => $qty,
-                ]);
-
-                $total += $plant->price * $qty;
-            }
-
-            $order->update(['total_price' => $total]);
-
-            DB::commit();
-            return redirect()->route('orders.index')->with('success', 'Commande confirmée.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->route('orders.create')->with('error', $e->getMessage());
-        }
-    }
-}
+cat > resources/views/admin/plants/edit.blade.php <<'EOF'
+@extends('layouts.app')
+@section('content')
+<h1>Modifier la plante</h1>
+@include('admin.plants._form', ['plant' => $plant])
+@endsection
 EOF
 
-# app/Http/Controllers/Admin/UsersController.php
-cat > app/Http/Controllers/Admin/UsersController.php <<'EOF'
-<?php
-
-namespace App\Http\Controllers\Admin;
-
-use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Http\Request;
-
-class UsersController extends Controller
-{
-    public function index() {
-        $users = User::orderBy('admin', 'desc')->get();
-        return view('admin.users.index', compact('users'));
-    }
-
-    public function show(User $user) {
-        return view('admin.users.show', compact('user'));
-    }
-
-    public function edit(User $user) {
-        return view('admin.users.edit', compact('user'));
-    }
-
-    public function update(Request $request, User $user) {
-        $data = $request->validate([
-            'name' => 'required|string',
-            'email' => 'required|email',
-            'admin' => 'boolean',
-        ]);
-
-        $user->update($data);
-        return redirect()->route('admin.users.index')->with('success', 'Utilisateur mis à jour.');
-    }
-
-    public function destroy(User $user) {
-        $user->delete();
-        return redirect()->route('admin.users.index')->with('success', 'Utilisateur supprimé.');
-    }
-}
+# Admin › Users
+cat > resources/views/admin/users/index.blade.php <<'EOF'
+@extends('layouts.app')
+@section('content')
+<h1 class="mb-4">Gestion des utilisateurs</h1>
+<table class="table table-hover rounded-3 overflow-hidden">
+ <thead class="table-warning"><tr><th>Nom</th><th>Email</th><th>Admin</th><th></th></tr></thead><tbody>
+ @foreach($users as $u)
+  <tr>
+    <td><a href="{{ route('admin.users.show',$u) }}">{{ $u->name }}</a></td>
+    <td>{{ $u->email }}</td>
+    <td>{!! $u->admin ? '✅' : '—' !!}</td>
+    <td class="text-end">
+      <a class="btn btn-sm btn-outline-dark rounded-3" href="{{ route('admin.users.edit',$u) }}">✏</a>
+      <form class="d-inline" method="POST" action="{{ route('admin.users.destroy',$u) }}" onsubmit="return confirm('Supprimer ?')">
+        @csrf @method('DELETE')<button class="btn btn-sm btn-danger rounded-3">🗑</button>
+      </form>
+    </td>
+  </tr>
+ @endforeach
+ </tbody>
+</table>
+@endsection
 EOF
 
-# app/Http/Controllers/Controller.php (ApplicationController)
-cat > app/Http/Controllers/Controller.php <<'EOF'
-<?php
-
-namespace App\Http\Controllers;
-
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Foundation\Bus\DispatchesJobs;
-use Illuminate\Foundation\Validation\ValidatesRequests;
-use Illuminate\Routing\Controller as BaseController;
-
-class Controller extends BaseController
-{
-    use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
-}
+cat > resources/views/admin/users/show.blade.php <<'EOF'
+@extends('layouts.app')
+@section('content')
+<h1>{{ $user->name }}</h1>
+<p><strong>Email :</strong> {{ $user->email }}</p>
+<p><strong>Admin :</strong> {{ $user->admin ? 'Oui' : 'Non' }}</p>
+<a class="btn btn-warning rounded-3" href="{{ route('admin.users.edit',$user) }}">Modifier</a>
+@endsection
 EOF
+
+cat > resources/views/admin/users/edit.blade.php <<'EOF'
+@extends('layouts.app')
+@section('content')
+<h1>Modifier l’utilisateur</h1>
+<form method="POST" action="{{ route('admin.users.update',$user) }}">@csrf @method('PUT')
+  <div class="mb-3"><label class="form-label">Nom</label><input class="form-control rounded-3" name="name" value="{{ old('name',$user->name) }}"></div>
+  <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control rounded-3" name="email" value="{{ old('email',$user->email) }}"></div>
+  <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="admin" id="isAdmin" {{ $user->admin?'checked':'' }}>
+    <label class="form-check-label" for="isAdmin">Administrateur</label></div>
+  <button class="btn btn-warning rounded-3">Enregistrer</button>
+</form>
+@endsection
+EOF
+
+# Orders › create
+cat > resources/views/orders/create.blade.php <<'EOF'
+{{-- alias de new.blade.php pour RESTful resource --}}
+@extends('orders.new')
+EOF
+
+# Users › edit
+cat > resources/views/users/edit.blade.php <<'EOF'
+@extends('layouts.app')
+@section('content')
+<h1>Modifier mon profil</h1>
+<form method="POST" action="{{ route('users.update',$user) }}">@csrf @method('PUT')
+  <div class="mb-3"><label class="form-label">Nom</label><input class="form-control rounded-3" name="name" value="{{ old('name',$user->name) }}"></div>
+  <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control rounded-3" name="email" value="{{ old('email',$user->email) }}"></div>
+  <button class="btn btn-warning rounded-3">Enregistrer</button>
+</form>
+@endsection
+EOF
+
+echo "✅ Vues Laravel créées avec succès."

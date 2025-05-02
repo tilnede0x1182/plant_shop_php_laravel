@@ -7,7 +7,7 @@ use App\Http\Controllers\UsersController;
 use App\Http\Controllers\Admin\PlantsController as AdminPlantsController;
 use App\Http\Controllers\Admin\UsersController as AdminUsersController;
 
-Route::get('/', [PlantsController::class, 'index'])->name('home');
+Route::get('/', [PlantsController::class, 'index']);
 
 Route::middleware(['auth'])->group(function () {
     Route::resource('orders', OrdersController::class)->only(['index', 'create', 'store']);
