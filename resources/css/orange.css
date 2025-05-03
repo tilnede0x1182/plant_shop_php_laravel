@@ -3,3 +3,6 @@
 .navbar-custom {
 	background-color: #de9a07db !important;
 }
+.navbar-nav .nav-link {
+  color: rgb(255, 240, 164) !important;
+}
