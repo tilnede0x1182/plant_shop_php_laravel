@@ -21,7 +21,7 @@
 				</ul>
 			</li>
 			@endif
-			<li class="nav-item">
+			<li class="nav-item ms-2">
 				<form method="POST" action="{{ route('logout') }}" class="d-inline">
 					@csrf
 					<button type="submit" class="nav-link btn btn-link px-0 align-baseline" style="text-decoration: none;">
