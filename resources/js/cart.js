@@ -122,14 +122,9 @@ window.Cart = {
         containerId = "order-review-container",
         inputId = "order-items-input"
     ) {
-        console.log(">>> Cart.renderOrderReview called");
         const container = document.getElementById(containerId);
         const input = document.getElementById(inputId);
         const cart = this.get();
-
-        console.log("Container:", container);
-        console.log("Input:", input);
-        console.log("Cart content:", cart);
 
         // Eviter rendu si alert succès ou erreur affichée
         if (
@@ -148,8 +143,6 @@ window.Cart = {
             return;
         }
 
-        console.log("Cart has content → render table");
-
         let total = 0;
         let html = `<table class="table shadow"><thead class="table-dark"><tr><th>Plante</th><th>Quantité</th><th>Total</th></tr></thead><tbody>`;
         const items = [];
@@ -165,9 +158,6 @@ window.Cart = {
         html += `</tbody></table><p class="text-end fw-bold">Total : ${total} €</p>`;
         container.innerHTML = html;
         input.value = JSON.stringify(items);
-
-        console.log("Panier affiché avec total:", total);
-        console.log("Payload JSON envoyé:", input.value);
     },
 };
 

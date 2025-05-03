@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('content')
-    @if (!session('success') && !session('error'))
+    @if (!session()->has('success') && !session()->has('error'))
         <h1 class="text-center mb-4">Valider ma commande</h1>
         <div id="order-review-container">
             <p class="alert alert-info">Chargement…</p>
@@ -11,11 +11,16 @@
         </form>
     @else
         <script>
-            @if (session('success'))
-                window.location.href = "{{ route('orders.index') }}";
-            @elseif (session('error'))
-                window.location.href = "{{ route('carts.index') }}";
-            @endif
+            document.addEventListener('DOMContentLoaded', function() {
+                @if (session('success'))
+                    console.log("Commande réussie : vidage du panier.");
+                    if (typeof Cart !== "undefined") Cart.clear();
+                    // window.location.href = "{{ route('orders.index') }}";
+                @elseif (session('error'))
+                    console.error("Erreur détectée : redirection vers le panier.");
+                    // window.location.href = "{{ route('carts.index') }}";
+                @endif
+            });
         </script>
     @endif
 
