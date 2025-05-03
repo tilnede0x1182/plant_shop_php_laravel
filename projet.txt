@@ -225,6 +225,7 @@ class User extends Authenticatable
 		'name',
 		'email',
 		'password',
+    'admin',
 	];
 
 	/**
@@ -463,34 +464,40 @@ use Illuminate\Http\Request;
 
 class UsersController extends Controller
 {
-    public function index() {
-        $users = User::orderBy('admin', 'desc')->get();
-        return view('admin.users.index', compact('users'));
-    }
+	public function index()
+	{
+		$users = User::orderBy('admin', 'desc')->orderBy('name')->get();
+		return view('admin.users.index', compact('users'));
+	}
 
-    public function show(User $user) {
-        return view('admin.users.show', compact('user'));
-    }
+	public function show(User $user)
+	{
+		return view('admin.users.show', compact('user'));
+	}
 
-    public function edit(User $user) {
-        return view('admin.users.edit', compact('user'));
-    }
+	public function edit(User $user)
+	{
+		return view('admin.users.edit', compact('user'));
+	}
 
-    public function update(Request $request, User $user) {
-        $data = $request->validate([
-            'name' => 'required|string',
-            'email' => 'required|email',
-            'admin' => 'boolean',
-        ]);
+	public function update(Request $request, User $user)
+	{
+		$data = $request->validate([
+			'name' => 'required|string',
+			'email' => 'required|email',
+		]);
 
-        $user->update($data);
-        return redirect()->route('admin.users.index')->with('success', 'Utilisateur mis à jour.');
-    }
+		$data['admin'] = $request->has('admin');
 
-    public function destroy(User $user) {
-        $user->delete();
-        return redirect()->route('admin.users.index')->with('success', 'Utilisateur supprimé.');
-    }
+		$user->update($data);
+		return redirect()->route('admin.users.index')->with('success', 'Utilisateur mis à jour.');
+	}
+
+	public function destroy(User $user)
+	{
+		$user->delete();
+		return redirect()->route('admin.users.index')->with('success', 'Utilisateur supprimé.');
+	}
 }
 
 
@@ -506,48 +513,48 @@ use Illuminate\Http\Request;
 
 class PlantsController extends Controller
 {
-    public function index()
-    {
-        return view('admin.plants.index', ['plants' => Plant::all()]);
-    }
+	public function index()
+	{
+		return view('admin.plants.index', ['plants' => Plant::orderBy('name')->get()]);
+	}
 
-    public function create()
-    {
-        return view('admin.plants.create', ['plant' => new Plant()]);
-    }
+	public function create()
+	{
+		return view('admin.plants.create', ['plant' => new Plant()]);
+	}
 
-    public function store(Request $request)
-    {
-        $plant = Plant::create($request->validate([
-            'name' => 'required|string',
-            'price' => 'required|integer',
-            'description' => 'nullable|string',
-            'stock' => 'required|integer',
-        ]));
-        return redirect()->route('admin.plants.index');
-    }
+	public function store(Request $request)
+	{
+		$plant = Plant::create($request->validate([
+			'name' => 'required|string',
+			'price' => 'required|integer',
+			'description' => 'nullable|string',
+			'stock' => 'required|integer',
+		]));
+		return redirect()->route('admin.plants.index');
+	}
 
-    public function edit(Plant $plant)
-    {
-        return view('admin.plants.edit', ['plant' => $plant]);
-    }
+	public function edit(Plant $plant)
+	{
+		return view('admin.plants.edit', ['plant' => $plant]);
+	}
 
-    public function update(Request $request, Plant $plant)
-    {
-        $plant->update($request->validate([
-            'name' => 'required|string',
-            'price' => 'required|integer',
-            'description' => 'nullable|string',
-            'stock' => 'required|integer',
-        ]));
-        return redirect()->route('admin.plants.index');
-    }
+	public function update(Request $request, Plant $plant)
+	{
+		$plant->update($request->validate([
+			'name' => 'required|string',
+			'price' => 'required|integer',
+			'description' => 'nullable|string',
+			'stock' => 'required|integer',
+		]));
+		return redirect()->route('admin.plants.index');
+	}
 
-    public function destroy(Plant $plant)
-    {
-        $plant->delete();
-        return redirect()->route('admin.plants.index');
-    }
+	public function destroy(Plant $plant)
+	{
+		$plant->delete();
+		return redirect()->route('admin.plants.index');
+	}
 }
 
 
@@ -607,7 +614,7 @@ class RegisteredUserController extends Controller
      */
     public function create(): View
     {
-        return view('auth.register');
+        return view('auth.custom-register');
     }
 
     /**
@@ -633,7 +640,7 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        return redirect()->route('home');
     }
 }
 
@@ -706,7 +713,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): View
     {
-        return view('auth.login');
+        return view('auth.custom-login');
     }
 
     /**
@@ -718,7 +725,7 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->route('home');
     }
 
     /**
@@ -1062,7 +1069,7 @@ class PlantsController extends Controller
 {
     public function index()
     {
-        return view('plants.index', ['plants' => Plant::all()]);
+			return view('plants.index', ['plants' => Plant::orderBy('name')->get()]);
     }
 
     public function show(Plant $plant)
@@ -1073,6 +1080,8 @@ class PlantsController extends Controller
 
 
 # app/Http/Controllers/CartController.php
+
+<?php
 
 namespace App\Http\Controllers;
 
@@ -1421,17 +1430,28 @@ $width = match ($width) {
 
 @extends('layouts.app')
 @section('content')
-<div class="card shadow-lg rounded-3"><div class="card-body">
-  <h1 class="card-title">{{ $plant->name }}</h1>
-  <p><strong>Prix :</strong> {{ $plant->price }} €</p>
-  <p><strong>Description :</strong> {{ $plant->description }}</p>
-  <p><strong>Stock :</strong> {{ $plant->stock }} unités</p>
-  <button class="btn btn-success rounded-3 mb-2" onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }})">Ajouter au panier</button>
-  @admin
-    <a class="btn btn-warning rounded-3" href="{{ route('admin.plants.edit',$plant) }}">Modifier</a>
-  @endadmin
-  <a class="btn btn-secondary rounded-3" href="{{ route('plants.index') }}">Retour</a>
-</div></div>
+<div class="card shadow-lg rounded-3">
+	<div class="card-body">
+		<h1 class="card-title">{{ $plant->name }}</h1>
+		<p><strong>Prix :</strong> {{ $plant->price }} €</p>
+		<p><strong>Description :</strong> {{ $plant->description }}</p>
+		<p><strong>Stock :</strong> {{ $plant->stock }} unités</p>
+		<div class="d-flex gap-2 flex-wrap mb-3">
+			<button class="btn btn-success rounded-3" onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }})">Ajouter au panier</button>
+			@auth
+			@if(Auth::user()->admin)
+			<a class="btn btn-warning rounded-3" href="{{ route('admin.plants.edit',$plant) }}">Modifier</a>
+			<form method="POST" action="{{ route('admin.plants.destroy', $plant) }}" onsubmit="return confirm('Supprimer ?')">
+				@csrf @method('DELETE')
+				<button class="btn btn-danger rounded-3">Supprimer</button>
+			</form>
+			@endif
+			@endauth
+		</div>
+
+		<a class="btn btn-secondary rounded-3" href="{{ route('plants.index') }}">Retour</a>
+	</div>
+</div>
 @endsection
 
 
@@ -1551,30 +1571,38 @@ $width = match ($width) {
 # resources/views/layouts/_navbar.blade.php
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-warning rounded-3 px-3">
-  <a class="navbar-brand fw-bold text-white" href="{{ route('home') }}">🌿 PlantShop</a>
-  <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navBar"><span class="navbar-toggler-icon"></span></button>
-  <div class="collapse navbar-collapse" id="navBar"><ul class="navbar-nav ms-auto">
-    <li class="nav-item"><a class="nav-link" id="cart-link" href="{{ route('carts.index') }}">Mon panier</a></li>
-    @auth
-      <li class="nav-item"><a class="nav-link" href="{{ route('orders.index') }}">Mes commandes</a></li>
-      <li class="nav-item"><a class="nav-link" href="{{ route('users.show', Auth::id()) }}">Profil</a></li>
-      @if(Auth::user()->admin)
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#">Admin</a>
-          <ul class="dropdown-menu">
-            <li><a class="dropdown-item" href="{{ route('admin.plants.index') }}">Plantes</a></li>
-            <li><a class="dropdown-item" href="{{ route('admin.users.index') }}">Utilisateurs</a></li>
-          </ul>
-        </li>
-      @endif
-      <li class="nav-item">
-        <form method="POST" action="{{ route('logout') }}">@csrf<button class="nav-link btn btn-link p-0">Déconnexion</button></form>
-      </li>
-    @else
-      <li class="nav-item"><a class="nav-link" href="{{ route('register') }}">S’inscrire</a></li>
-      <li class="nav-item"><a class="nav-link" href="{{ route('login') }}">Se connecter</a></li>
-    @endauth
-  </ul></div>
+	<a class="navbar-brand fw-bold text-white" href="{{ route('home') }}">🌿 PlantShop</a>
+	<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navBar"><span class="navbar-toggler-icon"></span></button>
+	<div class="collapse navbar-collapse" id="navBar">
+		<ul class="navbar-nav ms-auto">
+			<li class="nav-item"><a class="nav-link text-white" id="cart-link" href="{{ route('carts.index') }}">Mon panier</a></li>
+			@auth
+			<li class="nav-item"><a class="nav-link text-white" href="{{ route('orders.index') }}">Mes commandes</a></li>
+			<li class="nav-item"><a class="nav-link text-white" href="{{ route('users.show', Auth::id()) }}">Profil</a></li>
+			@if(Auth::user()->admin)
+			<li class="nav-item dropdown">
+				<a class="nav-link dropdown-toggle text-white" data-bs-toggle="dropdown" href="#">Admin</a>
+				<ul class="dropdown-menu">
+					<li><a class="dropdown-item" href="{{ route('admin.plants.index') }}">Plantes</a></li>
+					<li><a class="dropdown-item" href="{{ route('admin.users.index') }}">Utilisateurs</a></li>
+				</ul>
+			</li>
+			@endif
+			<li class="nav-item">
+				<form method="POST" action="{{ route('logout') }}" class="d-inline">
+					@csrf
+					<button type="submit" class="nav-link btn btn-link text-white px-0 align-baseline" style="text-decoration: none;">
+						Déconnexion
+					</button>
+				</form>
+			</li>
+
+			@else
+			<li class="nav-item"><a class="nav-link text-white" href="{{ route('register') }}">S’inscrire</a></li>
+			<li class="nav-item"><a class="nav-link text-white" href="{{ route('login') }}">Se connecter</a></li>
+			@endauth
+		</ul>
+	</div>
 </nav>
 
 
@@ -2065,6 +2093,35 @@ $width = match ($width) {
 </x-guest-layout>
 
 
+# resources/views/auth/custom-login.blade.php
+
+@extends('layouts.app')
+
+@section('content')
+<h1>Connexion</h1>
+<form method="POST" action="{{ route('login') }}" class="w-100" style="max-width: 500px">
+    @csrf
+
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input name="email" type="email" class="form-control" value="{{ old('email') }}" required autofocus>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Mot de passe</label>
+        <input name="password" type="password" class="form-control" required>
+    </div>
+
+    <div class="mb-3 form-check">
+        <input name="remember" type="checkbox" class="form-check-input" id="remember">
+        <label class="form-check-label" for="remember">Se souvenir de moi</label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Se connecter</button>
+</form>
+@endsection
+
+
 # resources/views/auth/verify-email.blade.php
 
 <x-guest-layout>
@@ -2098,6 +2155,40 @@ $width = match ($width) {
         </form>
     </div>
 </x-guest-layout>
+
+
+# resources/views/auth/custom-register.blade.php
+
+@extends('layouts.app')
+
+@section('content')
+<h1>Inscription</h1>
+<form method="POST" action="{{ route('register') }}" class="w-100" style="max-width: 500px">
+    @csrf
+
+    <div class="mb-3">
+        <label class="form-label">Nom</label>
+        <input name="name" type="text" class="form-control" value="{{ old('name') }}" required autofocus>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input name="email" type="email" class="form-control" value="{{ old('email') }}" required>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Mot de passe</label>
+        <input name="password" type="password" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Confirmation</label>
+        <input name="password_confirmation" type="password" class="form-control" required>
+    </div>
+
+    <button type="submit" class="btn btn-success">S’inscrire</button>
+</form>
+@endsection
 
 
 # resources/views/auth/login.blade.php
@@ -2536,6 +2627,8 @@ document.addEventListener("DOMContentLoaded", function () {
 │       │       └── show.blade.php
 │       ├── auth/
 │       │   ├── confirm-password.blade.php
+│       │   ├── custom-login.blade.php
+│       │   ├── custom-register.blade.php
 │       │   ├── forgot-password.blade.php
 │       │   ├── login.blade.php
 │       │   ├── register.blade.php
@@ -2605,4 +2698,4 @@ document.addEventListener("DOMContentLoaded", function () {
 ├── users.txt
 └── vite.config.js
 
-55 directories, 169 files
+55 directories, 171 files
