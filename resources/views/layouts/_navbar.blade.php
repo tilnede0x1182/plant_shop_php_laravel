@@ -1,10 +1,10 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-warning rounded-3 px-3">
+<nav class="navbar navbar-expand-lg navbar-dark rounded-3 navbar-custom px-3">
 	<a class="navbar-brand fw-bold text-white" href="{{ route('home') }}">🌿 PlantShop</a>
 	<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navBar"><span class="navbar-toggler-icon"></span></button>
 	<div class="collapse navbar-collapse" id="navBar">
 		<ul class="navbar-nav ms-auto">
 			@auth
-			<li class="nav-item d-flex align-items-center text-white px-2 fw-bold text-capitalize">
+			<li class="nav-item d-flex align-items-center text-white px-2 text-capitalize">
 				{{ Auth::user()->name }}@if(Auth::user()->admin) (Administrateur)@endif
 			</li>
 			@endauth
