@@ -8,7 +8,7 @@
 				{{ Auth::user()->name }}@if(Auth::user()->admin) (Administrateur)@endif
 			</li>
 			@endauth
-			<li class="nav-item"><a class="nav-link" id="cart-link" href="{{ route('carts.index') }}">Mon panier</a></li>
+			<li class="nav-item"><a class="nav-link" id="cart-link" href="{{ route('carts.index') }}">Mon Panier</a></li>
 			@auth
 			<li class="nav-item"><a class="nav-link" href="{{ route('orders.index') }}">Mes commandes</a></li>
 			<li class="nav-item"><a class="nav-link" href="{{ route('users.show', Auth::id()) }}">Profil</a></li>

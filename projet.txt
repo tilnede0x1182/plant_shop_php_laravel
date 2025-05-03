@@ -392,6 +392,7 @@ class Plant extends Model
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -400,55 +401,66 @@ use Illuminate\Support\Facades\DB;
 
 class OrdersController extends Controller
 {
-    public function index() {
-        $orders = Auth::user()->orders()->with('orderItems.plant')->get();
-        return view('orders.index', compact('orders'));
-    }
+	public function index()
+	{
+		$orders = Auth::user()->orders()->with('orderItems.plant')->get()->each(function ($order) {
+			$order->items = $order->orderItems;
+		});
+		return view('orders.index', compact('orders'));
+	}
 
-    public function create() {
-        return view('orders.new');
-    }
+	public function create()
+	{
+		return view('orders.new');
+	}
 
-    public function store(Request $request) {
-        $items = json_decode($request->input('order.items'), true);
-        $total = 0;
+	public function store(Request $request)
+	{
+		$items = json_decode($request->input('items'), true);
+		$total = 0;
 
-        try {
-            DB::beginTransaction();
+		try {
+			DB::beginTransaction();
 
-            $order = Order::create([
-                'user_id' => Auth::id(),
-                'status' => 'confirmed',
-                'total_price' => 0,
-            ]);
+			$order = Order::create([
+				'user_id' => Auth::id(),
+				'status' => 'confirmed',
+				'total_price' => 0,
+			]);
 
-            foreach ($items as $item) {
-                $plant = Plant::findOrFail($item['plant_id']);
-                $qty = intval($item['quantity']);
+			foreach ($items as $item) {
+				$plant = Plant::findOrFail($item['plant_id']);
+				$qty = intval($item['quantity']);
 
-                if ($plant->stock < $qty) {
-                    throw new \Exception("Stock insuffisant pour {$plant->name}");
-                }
+				if ($plant->stock < $qty) {
+					DB::rollBack();
+					return redirect()
+						->route('orders.create')
+						->with('alert', "Stock insuffisant pour {$plant->name}")
+						->with('stock_adjust', ['id' => $plant->id, 'available' => $plant->stock]);
+				}
 
-                $plant->decrement('stock', $qty);
-                OrderItem::create([
-                    'order_id' => $order->id,
-                    'plant_id' => $plant->id,
-                    'quantity' => $qty,
-                ]);
+				$plant->decrement('stock', $qty);
+				OrderItem::create([
+					'order_id' => $order->id,
+					'plant_id' => $plant->id,
+					'quantity' => $qty,
+				]);
 
-                $total += $plant->price * $qty;
-            }
+				$total += $plant->price * $qty;
+			}
 
-            $order->update(['total_price' => $total]);
+			$order->update(['total_price' => $total]);
 
-            DB::commit();
-            return redirect()->route('orders.index')->with('success', 'Commande confirmée.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->route('orders.create')->with('error', $e->getMessage());
-        }
-    }
+			DB::commit();
+			return redirect()->route('orders.index')->with('success', 'Commande confirmée.');
+		} catch (\Exception $e) {
+			DB::rollBack();
+			return redirect()
+				->route('carts.index')
+				->with('alert', "Erreur commande : " . $e->getMessage());
+		}
+	}
 }
 
 
@@ -1069,7 +1081,7 @@ class PlantsController extends Controller
 {
     public function index()
     {
-			return view('plants.index', ['plants' => Plant::orderBy('name')->get()]);
+			return view('plants.index', ['plants' => Plant::where('stock', '>', 0)->orderBy('name')->get()]);
     }
 
     public function show(Plant $plant)
@@ -1483,6 +1495,15 @@ $width = match ($width) {
 
 @section('content')
   <h1 class="mb-4">🛒 Mon Panier</h1>
+	@if(session('alert'))
+  <div class="alert alert-danger">{{ session('alert') }}</div>
+	@endif
+	@if(session('stock_adjust'))
+    <div class="alert alert-warning mt-2" role="alert"
+         data-stock-adjust='@json(session('stock_adjust'))'>
+        Stock ajusté automatiquement sur un ou plusieurs articles.
+    </div>
+	@endif
   <div id="cart-container">
     <p class="alert alert-info">Chargement du panier...</p>
   </div>
@@ -1499,14 +1520,30 @@ $width = match ($width) {
 
 @extends('layouts.app')
 @section('content')
-<h1 class="text-center mb-4">Valider ma commande</h1>
-@if(session('alert'))<div class="alert alert-danger rounded-3">{{ session('alert') }}</div>@endif
-<div id="order-review-container"><p class="alert alert-info">Chargement…</p></div>
-<form id="order-form" method="POST" action="{{ route('orders.store') }}" class="mt-3">@csrf
-  <input type="hidden" name="items" id="order-items-input">
-  <button class="btn btn-success w-100 rounded-3">Confirmer la commande</button>
-</form>
-<script>document.getElementById('order-form').addEventListener('submit',()=>Cart.clear())</script>
+    @if (!session('success') && !session('error'))
+        <h1 class="text-center mb-4">Valider ma commande</h1>
+        <div id="order-review-container">
+            <p class="alert alert-info">Chargement…</p>
+        </div>
+        <form id="order-form" method="POST" action="{{ route('orders.store') }}" class="mt-3">@csrf
+            <input type="hidden" name="items" id="order-items-input">
+            <button class="btn btn-success w-100 rounded-3">Confirmer la commande</button>
+        </form>
+    @else
+        <script>
+            @if (session('success'))
+                window.location.href = "{{ route('orders.index') }}";
+            @elseif (session('error'))
+                window.location.href = "{{ route('carts.index') }}";
+            @endif
+        </script>
+    @endif
+
+    @if (session('success'))
+        <script>
+            Cart.clear()
+        </script>
+    @endif
 @endsection
 
 
@@ -1570,36 +1607,40 @@ $width = match ($width) {
 
 # resources/views/layouts/_navbar.blade.php
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-warning rounded-3 px-3">
+<nav class="navbar navbar-expand-lg navbar-dark rounded-3 navbar-custom px-3">
 	<a class="navbar-brand fw-bold text-white" href="{{ route('home') }}">🌿 PlantShop</a>
 	<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navBar"><span class="navbar-toggler-icon"></span></button>
 	<div class="collapse navbar-collapse" id="navBar">
 		<ul class="navbar-nav ms-auto">
-			<li class="nav-item"><a class="nav-link text-white" id="cart-link" href="{{ route('carts.index') }}">Mon panier</a></li>
 			@auth
-			<li class="nav-item"><a class="nav-link text-white" href="{{ route('orders.index') }}">Mes commandes</a></li>
-			<li class="nav-item"><a class="nav-link text-white" href="{{ route('users.show', Auth::id()) }}">Profil</a></li>
+			<li class="nav-item d-flex align-items-center text-white px-2 text-capitalize">
+				{{ Auth::user()->name }}@if(Auth::user()->admin) (Administrateur)@endif
+			</li>
+			@endauth
+			<li class="nav-item"><a class="nav-link" id="cart-link" href="{{ route('carts.index') }}">Mon Panier</a></li>
+			@auth
+			<li class="nav-item"><a class="nav-link" href="{{ route('orders.index') }}">Mes commandes</a></li>
+			<li class="nav-item"><a class="nav-link" href="{{ route('users.show', Auth::id()) }}">Profil</a></li>
 			@if(Auth::user()->admin)
 			<li class="nav-item dropdown">
-				<a class="nav-link dropdown-toggle text-white" data-bs-toggle="dropdown" href="#">Admin</a>
+				<a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#">Admin</a>
 				<ul class="dropdown-menu">
 					<li><a class="dropdown-item" href="{{ route('admin.plants.index') }}">Plantes</a></li>
 					<li><a class="dropdown-item" href="{{ route('admin.users.index') }}">Utilisateurs</a></li>
 				</ul>
 			</li>
 			@endif
-			<li class="nav-item">
+			<li class="nav-item ms-2">
 				<form method="POST" action="{{ route('logout') }}" class="d-inline">
 					@csrf
-					<button type="submit" class="nav-link btn btn-link text-white px-0 align-baseline" style="text-decoration: none;">
+					<button type="submit" class="nav-link btn btn-link px-0 align-baseline" style="text-decoration: none;">
 						Déconnexion
 					</button>
 				</form>
 			</li>
-
 			@else
-			<li class="nav-item"><a class="nav-link text-white" href="{{ route('register') }}">S’inscrire</a></li>
-			<li class="nav-item"><a class="nav-link text-white" href="{{ route('login') }}">Se connecter</a></li>
+			<li class="nav-item"><a class="nav-link" href="{{ route('register') }}">S’inscrire</a></li>
+			<li class="nav-item"><a class="nav-link" href="{{ route('login') }}">Se connecter</a></li>
 			@endauth
 		</ul>
 	</div>
@@ -2298,6 +2339,7 @@ $width = match ($width) {
 # resources/js/app.js
 
 import './bootstrap';
+import './cart.js';
 
 import Alpine from 'alpinejs';
 
@@ -2317,103 +2359,106 @@ window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 # resources/js/cart.js
 
 window.Cart = {
-  get() {
-    try {
-      return JSON.parse(localStorage.getItem("cart") || "{}");
-    } catch (e) {
-      console.error("Erreur JSON", e);
-      return {};
-    }
-  },
+    get() {
+        try {
+            return JSON.parse(localStorage.getItem("cart") || "{}");
+        } catch (e) {
+            console.error("Erreur JSON", e);
+            return {};
+        }
+    },
 
-  save(cart) {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  },
+    save(cart) {
+        localStorage.setItem("cart", JSON.stringify(cart));
+    },
 
-  add(id, name, price, stock) {
-    const cart = this.get();
-    if (cart[id]) {
-      cart[id].quantity += 1;
-    } else {
-      cart[id] = { id, name, price, quantity: 1, stock };
-    }
-    this.save(cart);
-    this.updateNavbarCount();
-  },
+    add(id, name, price, stock) {
+        const cart = this.get();
+        if (cart[id]) {
+            cart[id].quantity += 1;
+        } else {
+            cart[id] = { id, name, price, quantity: 1, stock };
+        }
+        this.save(cart);
+        this.updateNavbarCount();
+    },
 
-  update(id, newQty) {
-    const qty = parseInt(newQty);
-    if (isNaN(qty)) return;
+    update(id, newQty) {
+        const qty = parseInt(newQty);
+        if (isNaN(qty)) return;
 
-    const cart = this.get();
-    if (!cart[id]) return;
+        const cart = this.get();
+        if (!cart[id]) return;
 
-    const input = document.querySelector("input[data-cart-id='" + id + "']");
-    const stock = parseInt(input.dataset.stock || "1");
+        const input = document.querySelector(
+            "input[data-cart-id='" + id + "']"
+        );
+        const stock = parseInt(input.dataset.stock || "1");
 
-    let correctedQty = qty;
-    if (qty < 1) correctedQty = 1;
-    if (qty > stock) correctedQty = stock;
+        let correctedQty = qty;
+        if (qty < 1) correctedQty = 1;
+        if (qty > stock) correctedQty = stock;
 
-    cart[id].quantity = correctedQty;
-    input.value = correctedQty;
+        cart[id].quantity = correctedQty;
+        input.value = correctedQty;
 
-    this.save(cart);
-    this.render();
-  },
+        this.save(cart);
+        this.render();
+    },
 
-  delayedUpdate(id, inputElem) {
-    clearTimeout(inputElem._cartTimer);
-    inputElem._cartTimer = setTimeout(() => {
-      this.update(id, inputElem.value);
-    }, 300);
-  },
+    delayedUpdate(id, inputElem) {
+        clearTimeout(inputElem._cartTimer);
+        inputElem._cartTimer = setTimeout(() => {
+            this.update(id, inputElem.value);
+        }, 300);
+    },
 
-  remove(id) {
-    const cart = this.get();
-    delete cart[id];
-    this.save(cart);
-    this.render();
-  },
+    remove(id) {
+        const cart = this.get();
+        delete cart[id];
+        this.save(cart);
+        this.render();
+    },
 
-  clear() {
-    localStorage.removeItem("cart");
-    this.render();
-  },
+    clear() {
+        localStorage.removeItem("cart");
+        this.render();
+    },
 
-  updateNavbarCount() {
-    const cart = this.get();
-    let count = 0;
-    for (const id in cart) {
-      count += cart[id].quantity;
-    }
-    const link = document.getElementById("cart-link");
-    if (link) {
-      link.innerText = "Mon Panier" + (count > 0 ? " (" + count + ")" : "");
-    }
-  },
+    updateNavbarCount() {
+        const cart = this.get();
+        let count = 0;
+        for (const id in cart) {
+            count += cart[id].quantity;
+        }
+        const link = document.getElementById("cart-link");
+        if (link) {
+            link.innerText =
+                "Mon Panier" + (count > 0 ? " (" + count + ")" : "");
+        }
+    },
 
-  render() {
-    const container = document.getElementById("cart-container");
-    if (!container) return;
+    render() {
+        const container = document.getElementById("cart-container");
+        if (!container) return;
 
-    const cart = this.get();
-    let html = "";
-    let total = 0;
+        const cart = this.get();
+        let html = "";
+        let total = 0;
 
-    if (Object.keys(cart).length === 0) {
-      html = "<p class='alert alert-info'>Votre panier est vide.</p>";
-    } else {
-      html += `
+        if (Object.keys(cart).length === 0) {
+            html = "<p class='alert alert-info'>Votre panier est vide.</p>";
+        } else {
+            html += `
         <table class="table">
           <thead class="table-dark">
             <tr><th>Plante</th><th>Quantité</th><th>Action</th></tr>
           </thead><tbody>`;
 
-      for (const id in cart) {
-        const item = cart[id];
-        total += item.price * item.quantity;
-        html += `
+            for (const id in cart) {
+                const item = cart[id];
+                total += item.price * item.quantity;
+                html += `
           <tr>
             <td><a href="/plants/${id}" class="text-decoration-none">${item.name}</a></td>
             <td><input type="number" min="1" class="form-control form-control-sm" style="max-width: 70px;"
@@ -2421,53 +2466,100 @@ window.Cart = {
               oninput="Cart.delayedUpdate(${id}, this)"></td>
             <td><button class="btn btn-danger btn-sm" onclick="Cart.remove(${id})">Retirer</button></td>
           </tr>`;
-      }
+            }
 
-      html += `</tbody></table><p class="text-end fw-bold">Total : ${total} €</p>
+            html += `</tbody></table><p class="text-end fw-bold">Total : ${total} €</p>
         <div class="d-flex justify-content-between">
           <button class="btn btn-outline-secondary btn-sm" onclick="Cart.clear()">Vider le panier</button>
-          <a href="/orders/new" class="btn btn-primary">Passer la commande</a>
+          <a href="/orders/create" class="btn btn-primary">Passer la commande</a>
         </div>`;
-    }
+        }
 
-    container.innerHTML = html;
-  },
+        container.innerHTML = html;
+    },
 
-  renderOrderReview(containerId = "order-review-container", inputId = "order-items-input") {
-    const container = document.getElementById(containerId);
-    const input = document.getElementById(inputId);
-    const cart = this.get();
-    let total = 0;
+    renderOrderReview(
+        containerId = "order-review-container",
+        inputId = "order-items-input"
+    ) {
+        console.log(">>> Cart.renderOrderReview called");
+        const container = document.getElementById(containerId);
+        const input = document.getElementById(inputId);
+        const cart = this.get();
 
-    if (!container || !input) return;
+        console.log("Container:", container);
+        console.log("Input:", input);
+        console.log("Cart content:", cart);
 
-    if (Object.keys(cart).length === 0) {
-      container.innerHTML = '<p class="alert alert-warning">Votre panier est vide.</p>';
-      input.value = "";
-      return;
-    }
+        // Eviter rendu si alert succès ou erreur affichée
+        if (
+            document.querySelector(".alert-success") ||
+            document.querySelector(".alert-danger")
+        ) {
+            container.innerHTML = "";
+            return;
+        }
+        if (!container || !input) return;
 
-    let html = `<table class="table shadow"><thead class="table-dark"><tr><th>Plante</th><th>Quantité</th><th>Total</th></tr></thead><tbody>`;
-    const items = [];
+        if (Object.keys(cart).length === 0) {
+            container.innerHTML =
+                '<p class="alert alert-warning">Votre panier est vide.</p>';
+            input.value = "";
+            return;
+        }
 
-    for (const id in cart) {
-      const item = cart[id];
-      const subtotal = item.quantity * item.price;
-      total += subtotal;
-      html += `<tr><td><a href="/plants/${item.id}" class="cart-plant-link">${item.name}</a></td><td>${item.quantity}</td><td>${subtotal} €</td></tr>`;
-      items.push({ plant_id: parseInt(id), quantity: item.quantity });
-    }
+        console.log("Cart has content → render table");
 
-    html += `</tbody></table><p class="text-end fw-bold">Total : ${total} €</p>`;
-    container.innerHTML = html;
-    input.value = JSON.stringify(items);
-  }
+        let total = 0;
+        let html = `<table class="table shadow"><thead class="table-dark"><tr><th>Plante</th><th>Quantité</th><th>Total</th></tr></thead><tbody>`;
+        const items = [];
+
+        for (const id in cart) {
+            const item = cart[id];
+            const subtotal = item.quantity * item.price;
+            total += subtotal;
+            html += `<tr><td><a href="/plants/${item.id}" class="cart-plant-link">${item.name}</a></td><td>${item.quantity}</td><td>${subtotal} €</td></tr>`;
+            items.push({ plant_id: parseInt(id), quantity: item.quantity });
+        }
+
+        html += `</tbody></table><p class="text-end fw-bold">Total : ${total} €</p>`;
+        container.innerHTML = html;
+        input.value = JSON.stringify(items);
+
+        console.log("Panier affiché avec total:", total);
+        console.log("Payload JSON envoyé:", input.value);
+    },
 };
 
+function applyStockAdjustmentFromAlert() {
+  const alert = document.querySelector("[data-stock-adjust]");
+  if (!alert) return;
+
+  try {
+      const data = JSON.parse(alert.dataset.stockAdjust);
+      const { id, available } = data;
+      const cart = Cart.get();
+
+      if (available > 0 && cart[id]) {
+          cart[id].quantity = available;
+          cart[id].stock = available;
+      } else {
+          delete cart[id];
+      }
+
+      Cart.save(cart);
+      Cart.render();
+      Cart.renderOrderReview();
+  } catch (e) {
+      console.error("Erreur ajustement stock :", e);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", function () {
-  Cart.updateNavbarCount();
-  Cart.render();
-  Cart.renderOrderReview();
+    Cart.updateNavbarCount();
+    Cart.render();
+    Cart.renderOrderReview();
+    applyStockAdjustmentFromAlert();
 });
 
 ==== STRUCTURE DU PROJET (filtres appliqués) ====
@@ -2583,6 +2675,7 @@ document.addEventListener("DOMContentLoaded", function () {
 │       └── tags/
 ├── .gitattributes
 ├── .gitignore
+├── Makefile
 ├── package.json
 ├── package-lock.json
 ├── phpunit.xml
@@ -2591,9 +2684,9 @@ document.addEventListener("DOMContentLoaded", function () {
 ├── public/
 │   ├── build/
 │   │   ├── assets/
-│   │   │   ├── app-Bf4POITK.js
-│   │   │   ├── app-XK1sKo6W.css
-│   │   │   └── orange-BGfokB5s.css
+│   │   │   ├── app-BdON96p8.js
+│   │   │   ├── app-BuvcaiTF.css
+│   │   │   └── orange-NDs0pG5x.css
 │   │   └── manifest.json
 │   ├── favicon.ico
 │   ├── .htaccess
@@ -2659,7 +2752,6 @@ document.addEventListener("DOMContentLoaded", function () {
 │       │   └── navigation.blade.php
 │       ├── orders/
 │       │   ├── create.blade.php
-│       │   ├── .create.blade.php.swp
 │       │   ├── index.blade.php
 │       │   └── new.blade.php
 │       ├── plants/

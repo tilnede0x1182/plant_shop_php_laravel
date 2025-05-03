@@ -9,7 +9,7 @@ class PlantsController extends Controller
 {
     public function index()
     {
-			return view('plants.index', ['plants' => Plant::orderBy('name')->get()]);
+			return view('plants.index', ['plants' => Plant::where('stock', '>', 0)->orderBy('name')->get()]);
     }
 
     public function show(Plant $plant)
