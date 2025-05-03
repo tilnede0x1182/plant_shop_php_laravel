@@ -6,7 +6,7 @@ export default defineConfig({
         laravel({
             input: [
                 'resources/css/app.css',
-                'resources/css/orange.css', // 👈 ajoute ceci
+                'resources/css/orange.css',
                 'resources/js/app.js',
             ],
             refresh: true,
