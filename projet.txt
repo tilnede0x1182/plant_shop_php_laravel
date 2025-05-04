@@ -422,12 +422,7 @@ class OrdersController extends Controller
 		try {
 			DB::beginTransaction();
 
-			$order = Order::create([
-				'user_id' => Auth::id(),
-				'status' => 'confirmed',
-				'total_price' => 0,
-			]);
-
+			// Valider les stocks d'abord
 			foreach ($items as $item) {
 				$plant = Plant::findOrFail($item['plant_id']);
 				$qty = intval($item['quantity']);
@@ -436,9 +431,22 @@ class OrdersController extends Controller
 					DB::rollBack();
 					return redirect()
 						->route('orders.create')
-						->with('alert', "Stock insuffisant pour {$plant->name}")
+						->with('error', "Stock insuffisant pour {$plant->name}")
 						->with('stock_adjust', ['id' => $plant->id, 'available' => $plant->stock]);
 				}
+			}
+
+			// Création après validation
+			$order = Order::create([
+				'user_id' => Auth::id(),
+				'status' => 'confirmed',
+				'total_price' => 0,
+			]);
+
+			// Traitement des items
+			foreach ($items as $item) {
+				$plant = Plant::findOrFail($item['plant_id']);
+				$qty = intval($item['quantity']);
 
 				$plant->decrement('stock', $qty);
 				OrderItem::create([
@@ -453,12 +461,12 @@ class OrdersController extends Controller
 			$order->update(['total_price' => $total]);
 
 			DB::commit();
-			return redirect()->route('orders.index')->with('success', 'Commande confirmée.');
+			return redirect()->route('orders.create')->with('success', true);
 		} catch (\Exception $e) {
 			DB::rollBack();
 			return redirect()
-				->route('carts.index')
-				->with('alert', "Erreur commande : " . $e->getMessage());
+				->route('orders.create')
+				->with('error', "Erreur commande : " . $e->getMessage());
 		}
 	}
 }
@@ -1442,28 +1450,36 @@ $width = match ($width) {
 
 @extends('layouts.app')
 @section('content')
-<div class="card shadow-lg rounded-3">
-	<div class="card-body">
-		<h1 class="card-title">{{ $plant->name }}</h1>
-		<p><strong>Prix :</strong> {{ $plant->price }} €</p>
-		<p><strong>Description :</strong> {{ $plant->description }}</p>
-		<p><strong>Stock :</strong> {{ $plant->stock }} unités</p>
-		<div class="d-flex gap-2 flex-wrap mb-3">
-			<button class="btn btn-success rounded-3" onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }})">Ajouter au panier</button>
-			@auth
-			@if(Auth::user()->admin)
-			<a class="btn btn-warning rounded-3" href="{{ route('admin.plants.edit',$plant) }}">Modifier</a>
-			<form method="POST" action="{{ route('admin.plants.destroy', $plant) }}" onsubmit="return confirm('Supprimer ?')">
-				@csrf @method('DELETE')
-				<button class="btn btn-danger rounded-3">Supprimer</button>
-			</form>
-			@endif
-			@endauth
-		</div>
+    <div class="card shadow-lg rounded-3">
+        <div class="card-body">
+            <h1 class="card-title">{{ $plant->name }}</h1>
+            <p><strong>Prix :</strong> {{ $plant->price }} €</p>
+            <p><strong>Description :</strong> {{ $plant->description }}</p>
+            @auth
+                @if (Auth::user()->admin)
+                    <p><strong>Stock :</strong> {{ $plant->stock }} unités</p>
+                @endif
+            @endauth
 
-		<a class="btn btn-secondary rounded-3" href="{{ route('plants.index') }}">Retour</a>
-	</div>
-</div>
+            <div class="d-flex gap-2 flex-wrap mb-3">
+                <button class="btn btn-success rounded-3"
+                    onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }})">Ajouter au
+                    panier</button>
+                @auth
+                    @if (Auth::user()->admin)
+                        <a class="btn btn-warning rounded-3" href="{{ route('admin.plants.edit', $plant) }}">Modifier</a>
+                        <form method="POST" action="{{ route('admin.plants.destroy', $plant) }}"
+                            onsubmit="return confirm('Supprimer ?')">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-danger rounded-3">Supprimer</button>
+                        </form>
+                    @endif
+                @endauth
+            </div>
+
+            <a class="btn btn-secondary rounded-3" href="{{ route('plants.index') }}">Retour</a>
+        </div>
+    </div>
 @endsection
 
 
@@ -1471,21 +1487,33 @@ $width = match ($width) {
 
 @extends('layouts.app')
 @section('content')
-<h1 class="text-center mb-4">🌿 Liste des plantes</h1>
-@auth @if(Auth::user()->admin)
-  <a class="btn btn-warning mb-3 rounded-3" href="{{ route('admin.plants.create') }}">Nouvelle plante</a>
-@endif @endauth
-<div class="row">
-  @foreach($plants as $plant)
-    <div class="col-md-4"><div class="card mb-4 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title"><a class="text-decoration-none text-dark" href="{{ route('plants.show',$plant) }}">{{ $plant->name }}</a></h5>
-        <p class="card-text"><strong>Prix :</strong> {{ $plant->price }} €<br><strong>Stock :</strong> {{ $plant->stock }}</p>
-        <button class="btn btn-success w-100 rounded-3" onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }}, {{ $plant->stock }})">Ajouter au panier</button>
-      </div></div>
+    <h1 class="text-center mb-4">🌿 Liste des plantes</h1>
+    @auth @if (Auth::user()->admin)
+        <a class="btn btn-warning mb-3 rounded-3" href="{{ route('admin.plants.create') }}">Nouvelle plante</a>
+    @endif @endauth
+    <div class="row">
+        @foreach ($plants as $plant)
+            <div class="col-md-4">
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title"><a class="text-decoration-none text-dark"
+                                href="{{ route('plants.show', $plant) }}">{{ $plant->name }}</a></h5>
+                        <p class="card-text">
+                            <strong>Prix :</strong> {{ $plant->price }} €
+                            @auth
+                                @if (Auth::user()->admin)
+                                    <br><strong>Stock :</strong> {{ $plant->stock }}
+                                @endif
+                            @endauth
+                        </p>
+                        <button class="btn btn-success w-100 rounded-3"
+                            onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }}, {{ $plant->stock }})">Ajouter
+                            au panier</button>
+                    </div>
+                </div>
+            </div>
+        @endforeach
     </div>
-  @endforeach
-</div>
 @endsection
 
 
@@ -1519,29 +1547,30 @@ $width = match ($width) {
 # resources/views/orders/new.blade.php
 
 @extends('layouts.app')
+
 @section('content')
-    @if (!session('success') && !session('error'))
+    @if (!session()->has('success') && !session()->has('error'))
         <h1 class="text-center mb-4">Valider ma commande</h1>
         <div id="order-review-container">
             <p class="alert alert-info">Chargement…</p>
         </div>
-        <form id="order-form" method="POST" action="{{ route('orders.store') }}" class="mt-3">@csrf
+        <form id="order-form" method="POST" action="{{ route('orders.store') }}" class="mt-3">
+            @csrf
             <input type="hidden" name="items" id="order-items-input">
             <button class="btn btn-success w-100 rounded-3">Confirmer la commande</button>
         </form>
     @else
         <script>
-            @if (session('success'))
-                window.location.href = "{{ route('orders.index') }}";
-            @elseif (session('error'))
-                window.location.href = "{{ route('carts.index') }}";
-            @endif
-        </script>
-    @endif
-
-    @if (session('success'))
-        <script>
-            Cart.clear()
+            document.addEventListener('DOMContentLoaded', function() {
+                @if (session('success'))
+                    // console.log("Commande réussie : vidage du panier.");
+                    if (typeof Cart !== "undefined") Cart.clear();
+                    window.location.href = "{{ route('orders.index') }}";
+                @elseif (session('error'))
+                    // console.error("Erreur détectée : redirection vers le panier.");
+                    window.location.href = "{{ route('carts.index') }}";
+                @endif
+            });
         </script>
     @endif
 @endsection
@@ -1555,9 +1584,9 @@ $width = match ($width) {
 @if($orders->isEmpty())
   <p class="alert alert-info">Aucune commande.</p>
 @else
-  @foreach($orders->reverse() as $idx=>$order)
-    <div class="card mb-3 shadow-sm rounded-3"><div class="card-body">
-      <h5 class="card-title">Commande n°{{ $orders->count() - $idx }}</h5>
+	@foreach($orders as $idx => $order)
+	  <div class="card mb-3 shadow-sm rounded-3"><div class="card-body">
+  	  <h5 class="card-title">Commande n°{{ $orders->count() - $idx }}</h5>
       <p class="text-muted mb-1">Passée le {{ $order->created_at->format('d/m/Y H:i') }} — Total : {{ $order->total_price }} €</p>
       <ul class="mb-2">
         @foreach($order->items as $it)
@@ -1769,6 +1798,8 @@ $width = match ($width) {
 
 @if(session('notice')) <div class="alert alert-success rounded-3">{{ session('notice') }}</div>@endif
 @if(session('alert'))  <div class="alert alert-danger  rounded-3">{{ session('alert')  }}</div>@endif
+@if(session('success')) <div class="alert alert-success rounded-3">Commande confirmée.</div>@endif
+@if(session('error')) <div class="alert alert-danger rounded-3">{{ session('error') }}</div>@endif
 
 
 # resources/views/dashboard.blade.php
@@ -2482,14 +2513,9 @@ window.Cart = {
         containerId = "order-review-container",
         inputId = "order-items-input"
     ) {
-        console.log(">>> Cart.renderOrderReview called");
         const container = document.getElementById(containerId);
         const input = document.getElementById(inputId);
         const cart = this.get();
-
-        console.log("Container:", container);
-        console.log("Input:", input);
-        console.log("Cart content:", cart);
 
         // Eviter rendu si alert succès ou erreur affichée
         if (
@@ -2508,8 +2534,6 @@ window.Cart = {
             return;
         }
 
-        console.log("Cart has content → render table");
-
         let total = 0;
         let html = `<table class="table shadow"><thead class="table-dark"><tr><th>Plante</th><th>Quantité</th><th>Total</th></tr></thead><tbody>`;
         const items = [];
@@ -2525,9 +2549,6 @@ window.Cart = {
         html += `</tbody></table><p class="text-end fw-bold">Total : ${total} €</p>`;
         container.innerHTML = html;
         input.value = JSON.stringify(items);
-
-        console.log("Panier affiché avec total:", total);
-        console.log("Payload JSON envoyé:", input.value);
     },
 };
 
@@ -2645,6 +2666,7 @@ document.addEventListener("DOMContentLoaded", function () {
 │   ├── COMMIT_EDITMSG
 │   ├── config
 │   ├── description
+│   ├── FETCH_HEAD
 │   ├── HEAD
 │   ├── hooks/
 │   │   ├── applypatch-msg.sample*
@@ -2667,11 +2689,18 @@ document.addEventListener("DOMContentLoaded", function () {
 │   ├── logs/
 │   │   ├── HEAD
 │   │   └── refs/
-│   │       └── heads/
-│   │           └── master
+│   │       ├── heads/
+│   │       │   └── master
+│   │       └── remotes/
+│   │           └── origin/
+│   │               └── master
+│   ├── packed-refs
 │   └── refs/
 │       ├── heads/
 │       │   └── master
+│       ├── remotes/
+│       │   └── origin/
+│       │       └── master
 │       └── tags/
 ├── .gitattributes
 ├── .gitignore
@@ -2684,13 +2713,14 @@ document.addEventListener("DOMContentLoaded", function () {
 ├── public/
 │   ├── build/
 │   │   ├── assets/
-│   │   │   ├── app-BdON96p8.js
+│   │   │   ├── app-BbPOqj5z.js
 │   │   │   ├── app-BuvcaiTF.css
 │   │   │   └── orange-NDs0pG5x.css
 │   │   └── manifest.json
 │   ├── favicon.ico
 │   ├── .htaccess
 │   ├── index.php
+│   ├── plantshop - content.ico:Zone.Identifier
 │   ├── robots.txt
 │   └── svg/
 │       ├── laravel-dark.svg
@@ -2790,4 +2820,4 @@ document.addEventListener("DOMContentLoaded", function () {
 ├── users.txt
 └── vite.config.js
 
-55 directories, 171 files
+59 directories, 176 files
