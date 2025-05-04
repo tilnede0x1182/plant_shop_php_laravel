@@ -66,9 +66,6 @@ npm install && npm run build
 # Copier la config d'environnement
 cp .env.example .env
 
-# Générer la clé
-php artisan key:generate
-
 # Créer la base PostgreSQL manuellement
 # Exemple : CREATE DATABASE plant_shop;
 
