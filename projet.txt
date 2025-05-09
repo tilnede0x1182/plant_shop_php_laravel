@@ -2667,6 +2667,7 @@ document.addEventListener("DOMContentLoaded", function () {
 │   ├── config
 │   ├── description
 │   ├── FETCH_HEAD
+│   ├── gitk.cache
 │   ├── HEAD
 │   ├── hooks/
 │   │   ├── applypatch-msg.sample*
@@ -2820,4 +2821,4 @@ document.addEventListener("DOMContentLoaded", function () {
 ├── users.txt
 └── vite.config.js
 
-59 directories, 176 files
+59 directories, 177 files
