@@ -14,37 +14,47 @@ use Illuminate\View\View;
 
 class RegisteredUserController extends Controller
 {
-    /**
-     * Display the registration view.
-     */
-    public function create(): View
-    {
-        return view('auth.custom-register');
-    }
+	/**
+	 * Display the registration view.
+	 */
+	public function create(): View
+	{
+		return view('auth.custom-register');
+	}
 
-    /**
-     * Handle an incoming registration request.
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
-    public function store(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-        ]);
+	/**
+	 * Handle an incoming registration request.
+	 *
+	 * @throws \Illuminate\Validation\ValidationException
+	 */
+	public function store(Request $request): RedirectResponse
+	{
+		$request->validate([
+			'name' => ['required', 'string', 'max:255'],
+			'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
+			'password' => ['required', 'confirmed', Rules\Password::defaults()],
+		]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+		try {
+			$user = User::create([
+				'name' => $request->name,
+				'email' => $request->email,
+				'password' => Hash::make($request->password),
+			]);
+		} catch (\Illuminate\Database\QueryException $e) {
+			if ($e->getCode() === '23505') { // doublon email (PostgreSQL)
+				return back()
+					->withInput()
+					->withErrors(['email' => 'Cet email est déjà utilisé.']);
+			}
+			throw $e;
+		}
 
-        event(new Registered($user));
 
-        Auth::login($user);
+		event(new Registered($user));
 
-        return redirect()->route('home');
-    }
+		Auth::login($user);
+
+		return redirect()->route('home');
+	}
 }

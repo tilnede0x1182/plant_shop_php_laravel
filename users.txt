@@ -4,18 +4,18 @@ admin2@planteshop.com password
 admin3@planteshop.com password
 
 === USERS ===
-zpruvost@example.org password
-xbertrand@example.com password
-ulebreton@example.com password
-francois.gerard@example.com password
-pnguyen@example.org password
-slecoq@example.org password
-marcel.letellier@example.org password
-marc.leblanc@example.org password
-anne.robert@example.net password
-elise.bouchet@example.net password
-jules.gerard@example.org password
-louise.mendes@example.net password
-arthur.gros@example.net password
-neveu.caroline@example.net password
-vallet.julie@example.org password
+isaac.morvan@example.org password
+rperrier@example.com password
+apelletier@example.net password
+asimon@example.org password
+poulain.aurelie@example.net password
+nchevallier@example.com password
+chretien.marcelle@example.org password
+suzanne.hoareau@example.com password
+vchretien@example.org password
+guy.desousa@example.com password
+philippine68@example.com password
+gilles85@example.com password
+hmonnier@example.net password
+thibault.david@example.com password
+dcharrier@example.com password

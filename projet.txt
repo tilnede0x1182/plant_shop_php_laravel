@@ -2390,13 +2390,9 @@ window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 # resources/js/cart.js
 
 class Cart {
-  constructor() {}
-
   /**
-   * Récupère le contenu du panier depuis le localStorage.
-   *
-   * @return {Object} Le panier sous forme d'objet JavaScript.
-   *                 Si une erreur JSON se produit, retourne un objet vide.
+   * Récupère le panier depuis localStorage.
+   * @returns {Object} contenu du panier
    */
   get() {
     try {
@@ -2408,21 +2404,19 @@ class Cart {
   }
 
   /**
-   * Sauvegarde le panier dans le localStorage.
-   *
-   * @param {Object} cart - Le panier à sauvegarder.
+   * Sauvegarde le panier dans localStorage.
+   * @param {Object} cart contenu à enregistrer
    */
   save(cart) {
     localStorage.setItem("cart", JSON.stringify(cart));
   }
 
   /**
-   * Ajoute un produit au panier. Si le produit existe déjà, augmente sa quantité.
-   *
-   * @param {number} id - L'identifiant unique du produit.
-   * @param {string} name - Le nom du produit.
-   * @param {number} price - Le prix unitaire du produit.
-   * @param {number} stock - La quantité disponible en stock.
+   * Ajoute un article au panier.
+   * @param {number} id identifiant
+   * @param {string} name nom
+   * @param {number} price prix
+   * @param {number} stock disponible
    */
   add(id, name, price, stock) {
     const cart = this.get();
@@ -2436,11 +2430,9 @@ class Cart {
   }
 
   /**
-   * Met à jour la quantité d'un produit dans le panier.
-   * Si la quantité est invalide (non numérique ou hors stock), elle est corrigée automatiquement.
-   *
-   * @param {number} id - L'identifiant unique du produit.
-   * @param {number|string} newQty - La nouvelle quantité à appliquer.
+   * Met à jour une quantité.
+   * @param {number} id identifiant
+   * @param {number|string} newQty quantité cible
    */
   update(id, newQty) {
     const qty = parseInt(newQty);
@@ -2449,23 +2441,32 @@ class Cart {
     const cart = this.get();
     if (!cart[id]) return;
 
-    const input = document.querySelector(`input[data-cart-id='${id}']`);
-    const stock = parseInt(input.dataset.stock || "1");
+    const input = document.querySelector(`input[data-cart-id="${id}"]`);
+    const stock = parseInt(input?.dataset?.stock) || 1;
 
-    let correctedQty = qty;
-    if (qty < 1) correctedQty = 1;
-    if (qty > stock) correctedQty = stock;
-
+    let correctedQty = Math.max(1, Math.min(qty, stock));
     cart[id].quantity = correctedQty;
-    input.value = correctedQty;
+    if (input) input.value = correctedQty;
+
     this.save(cart);
     this.render();
   }
 
   /**
-   * Supprime un produit du panier.
-   *
-   * @param {number} id - L'identifiant unique du produit à supprimer.
+   * Met à jour avec temporisation.
+   * @param {number} id identifiant
+   * @param {HTMLInputElement} inputElem champ quantité
+   */
+  delayedUpdate(id, inputElem) {
+    clearTimeout(inputElem._cartTimer);
+    inputElem._cartTimer = setTimeout(() => {
+      this.update(id, inputElem.value);
+    }, 300);
+  }
+
+  /**
+   * Supprime un article.
+   * @param {number} id identifiant
    */
   remove(id) {
     const cart = this.get();
@@ -2483,17 +2484,12 @@ class Cart {
   }
 
   /**
-   * Met à jour le compteur du panier dans la barre de navigation.
-   * Affiche le nombre total d'articles présents dans le panier.
+   * Met à jour le compteur dans la navbar.
    */
   updateNavbarCount() {
+    console.log("updateNavbarCount");
     const cart = this.get();
-    let count = 0;
-
-    for (const id in cart) {
-      count += cart[id].quantity;
-    }
-
+    const count = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0);
     const link = document.getElementById("cart-link");
     if (link) {
       link.innerText = `Mon Panier${count > 0 ? ` (${count})` : ""}`;
@@ -2501,104 +2497,7 @@ class Cart {
   }
 
   /**
-   * Met à jour la quantité d'un produit après un délai.
-   * Utilisé pour éviter des mises à jour trop fréquentes lors de la saisie rapide.
-   *
-   * @param {number} id - L'identifiant unique du produit.
-   * @param {HTMLInputElement} inputElem - L'élément input associé au produit.
-   */
-  delayedUpdate(id, inputElem) {
-    clearTimeout(inputElem._cartTimer);
-    inputElem._cartTimer = setTimeout(() => {
-      this.update(id, inputElem.value);
-    }, 300); // délai pour laisser le temps à l'utilisateur
-  }
-
-  /**
-   * Affiche un résumé de la commande dans un conteneur spécifique.
-   *
-   * @param {string} [containerId="order-review-container"] - L'id du conteneur HTML où afficher le résumé.
-   * @param {string} [inputId="order-items-input"] - L'id de l'élément input où encoder les articles pour le backend.
-   */
-  renderOrderReview(containerId = "order-review-container", inputId = "order-items-input") {
-    const container = document.getElementById(containerId);
-    const input = document.getElementById(inputId);
-
-    const cart = this.get();
-    let total = 0;
-
-    if (!container || !input) return;
-
-    if (Object.keys(cart).length === 0) {
-      container.innerHTML = "";
-      const alert = document.createElement("p");
-      alert.className = "alert alert-warning";
-      alert.textContent = "Votre panier est vide.";
-      container.appendChild(alert);
-      input.value = "";
-      return;
-    }
-
-    const table = document.createElement("table");
-    table.className = "table shadow";
-
-    const thead = document.createElement("thead");
-    thead.className = "table-dark";
-    const headerRow = document.createElement("tr");
-    ["Plante", "Quantité", "Total"].forEach((headerText) => {
-      const th = document.createElement("th");
-      th.textContent = headerText;
-      headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-    const items = [];
-
-    for (const id in cart) {
-      const item = cart[id];
-      const subtotal = item.quantity * item.price;
-      total += subtotal;
-
-      const row = document.createElement("tr");
-
-      const plantCell = document.createElement("td");
-      const link = document.createElement("a");
-      link.href = `/plants/${id}`;
-      link.className = "cart-plant-link";
-      link.textContent = item.name;
-      plantCell.appendChild(link);
-      row.appendChild(plantCell);
-
-      const quantityCell = document.createElement("td");
-      quantityCell.textContent = item.quantity;
-      row.appendChild(quantityCell);
-
-      const totalCell = document.createElement("td");
-      totalCell.textContent = `${subtotal} €`;
-      row.appendChild(totalCell);
-
-      tbody.appendChild(row);
-
-      items.push({ plant_id: parseInt(id), quantity: item.quantity });
-    }
-
-    table.appendChild(tbody);
-    container.innerHTML = ""; // Clear previous content
-    container.appendChild(table);
-
-    const totalParagraph = document.createElement("p");
-    totalParagraph.className = "text-end fw-bold";
-    totalParagraph.textContent = `Total : ${total} €`;
-    container.appendChild(totalParagraph);
-
-    input.value = JSON.stringify(items);
-  }
-
-  /**
-   * Affiche le panier complet dans le conteneur HTML.
-   * Permet de modifier les quantités, supprimer des produits, et vider le panier.
+   * Rendu du panier complet.
    */
   render() {
     const container = document.getElementById("cart-container");
@@ -2606,7 +2505,6 @@ class Cart {
 
     const cart = this.get();
     container.innerHTML = "";
-    let total = 0;
 
     this.updateNavbarCount();
 
@@ -2624,15 +2522,16 @@ class Cart {
     const thead = document.createElement("thead");
     thead.className = "table-dark";
     const headerRow = document.createElement("tr");
-    ["Plante", "Quantité", "Action"].forEach((headerText) => {
+    ["Plante", "Quantité", "Action"].forEach(text => {
       const th = document.createElement("th");
-      th.textContent = headerText;
+      th.textContent = text;
       headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
+    let total = 0;
 
     for (const id in cart) {
       const item = cart[id];
@@ -2640,15 +2539,14 @@ class Cart {
 
       const row = document.createElement("tr");
 
-      const plantCell = document.createElement("td");
+      const tdName = document.createElement("td");
       const link = document.createElement("a");
       link.href = `/plants/${id}`;
       link.className = "text-decoration-none";
       link.textContent = item.name;
-      plantCell.appendChild(link);
-      row.appendChild(plantCell);
+      tdName.appendChild(link);
 
-      const quantityCell = document.createElement("td");
+      const tdQty = document.createElement("td");
       const input = document.createElement("input");
       input.type = "number";
       input.min = "1";
@@ -2658,54 +2556,171 @@ class Cart {
       input.dataset.cartId = id;
       input.dataset.stock = item.stock;
       input.oninput = () => this.delayedUpdate(id, input);
-      quantityCell.appendChild(input);
-      row.appendChild(quantityCell);
+      tdQty.appendChild(input);
 
-      const actionCell = document.createElement("td");
-      const button = document.createElement("button");
-      button.className = "btn btn-danger btn-sm";
-      button.textContent = "Retirer";
-      button.onclick = () => this.remove(id);
-      actionCell.appendChild(button);
-      row.appendChild(actionCell);
+      const tdAction = document.createElement("td");
+      const btn = document.createElement("button");
+      btn.className = "btn btn-danger btn-sm";
+      btn.textContent = "Retirer";
+      btn.onclick = () => this.remove(id);
+      tdAction.appendChild(btn);
 
+      row.appendChild(tdName);
+      row.appendChild(tdQty);
+      row.appendChild(tdAction);
       tbody.appendChild(row);
     }
 
     table.appendChild(tbody);
     container.appendChild(table);
 
-    const totalParagraph = document.createElement("p");
-    totalParagraph.className = "text-end fw-bold";
-    totalParagraph.textContent = `Total : ${total} €`;
-    container.appendChild(totalParagraph);
+    const totalEl = document.createElement("p");
+    totalEl.className = "text-end fw-bold";
+    totalEl.textContent = `Total : ${total} €`;
+    container.appendChild(totalEl);
 
     const actionsDiv = document.createElement("div");
     actionsDiv.className = "d-flex justify-content-between";
 
-    const clearButton = document.createElement("button");
-    clearButton.className = "btn btn-outline-secondary btn-sm";
-    clearButton.textContent = "Vider le panier";
-    clearButton.onclick = () => this.clear();
-    actionsDiv.appendChild(clearButton);
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "btn btn-outline-secondary btn-sm";
+    clearBtn.textContent = "Vider le panier";
+    clearBtn.onclick = () => this.clear();
 
     const checkoutLink = document.createElement("a");
-    checkoutLink.href = "/orders/new";
+    checkoutLink.href = "/orders/create";
     checkoutLink.className = "btn btn-primary";
     checkoutLink.textContent = "Passer la commande";
-    actionsDiv.appendChild(checkoutLink);
 
+    actionsDiv.appendChild(clearBtn);
+    actionsDiv.appendChild(checkoutLink);
     container.appendChild(actionsDiv);
+  }
+
+  /**
+   * Affiche le récapitulatif de commande.
+   * @param {string} containerId ID du conteneur
+   * @param {string} inputId ID du champ input
+   */
+  renderOrderReview(containerId = "order-review-container", inputId = "order-items-input") {
+    const container = document.getElementById(containerId);
+    const input = document.getElementById(inputId);
+    const cart = this.get();
+
+    if (
+      document.querySelector(".alert-success") ||
+      document.querySelector(".alert-danger")
+    ) {
+      container.innerHTML = "";
+      return;
+    }
+
+    if (!container || !input) return;
+
+    if (Object.keys(cart).length === 0) {
+      const alert = document.createElement("p");
+      alert.className = "alert alert-warning";
+      alert.textContent = "Votre panier est vide.";
+      container.innerHTML = "";
+      container.appendChild(alert);
+      input.value = "";
+      return;
+    }
+
+    const table = document.createElement("table");
+    table.className = "table shadow";
+    const thead = document.createElement("thead");
+    thead.className = "table-dark";
+    const headerRow = document.createElement("tr");
+    ["Plante", "Quantité", "Total"].forEach(text => {
+      const th = document.createElement("th");
+      th.textContent = text;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    let total = 0;
+    const items = [];
+
+    for (const id in cart) {
+      const item = cart[id];
+      const subtotal = item.price * item.quantity;
+      total += subtotal;
+
+      const row = document.createElement("tr");
+
+      const tdName = document.createElement("td");
+      const link = document.createElement("a");
+      link.href = `/plants/${item.id}`;
+      link.className = "cart-plant-link";
+      link.textContent = item.name;
+      tdName.appendChild(link);
+
+      const tdQty = document.createElement("td");
+      tdQty.textContent = item.quantity;
+
+      const tdTotal = document.createElement("td");
+      tdTotal.textContent = `${subtotal} €`;
+
+      row.appendChild(tdName);
+      row.appendChild(tdQty);
+      row.appendChild(tdTotal);
+
+      tbody.appendChild(row);
+
+      items.push({ plant_id: parseInt(id), quantity: item.quantity });
+    }
+
+    table.appendChild(tbody);
+    container.innerHTML = "";
+    container.appendChild(table);
+
+    const totalEl = document.createElement("p");
+    totalEl.className = "text-end fw-bold";
+    totalEl.textContent = `Total : ${total} €`;
+    container.appendChild(totalEl);
+
+    input.value = JSON.stringify(items);
   }
 }
 
-// Instanciation de la classe et initialisation
-const cartInstance = new Cart();
+/**
+ * Ajuste le stock suite à une alerte serveur.
+ */
+function applyStockAdjustmentFromAlert() {
+  const alert = document.querySelector("[data-stock-adjust]");
+  if (!alert) return;
 
-document.addEventListener("DOMContentLoaded", function () {
-  cartInstance.renderOrderReview();
-  cartInstance.updateNavbarCount();
-  cartInstance.render();
+  try {
+    const data = JSON.parse(alert.dataset.stockAdjust);
+    const { id, available } = data;
+    const cart = Cart.get();
+
+    if (available > 0 && cart[id]) {
+      cart[id].quantity = available;
+      cart[id].stock = available;
+    } else {
+      delete cart[id];
+    }
+
+    Cart.save(cart);
+    Cart.render();
+    Cart.renderOrderReview();
+  } catch (e) {
+    console.error("Erreur ajustement stock :", e);
+  }
+}
+
+// Initialisation
+window.Cart = new Cart();
+
+document.addEventListener("DOMContentLoaded", () => {
+  window.Cart.updateNavbarCount();
+  window.Cart.render();
+  window.Cart.renderOrderReview();
+  applyStockAdjustmentFromAlert();
 });
 
 ==== STRUCTURE DU PROJET (filtres appliqués) ====
@@ -2839,8 +2854,8 @@ document.addEventListener("DOMContentLoaded", function () {
 ├── public/
 │   ├── build/
 │   │   ├── assets/
-│   │   │   ├── app-BbPOqj5z.js
 │   │   │   ├── app-BuvcaiTF.css
+│   │   │   ├── app-CzBGtjEM.js
 │   │   │   └── orange-NDs0pG5x.css
 │   │   └── manifest.json
 │   ├── favicon.ico
