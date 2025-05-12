@@ -13,7 +13,8 @@
 
             <div class="d-flex gap-2 flex-wrap mb-3">
                 <button class="btn btn-success rounded-3"
-                    onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }})">Ajouter au
+                    onclick="window.Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }})">Ajouter
+                    au
                     panier</button>
                 @auth
                     @if (Auth::user()->admin)

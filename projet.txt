@@ -629,39 +629,49 @@ use Illuminate\View\View;
 
 class RegisteredUserController extends Controller
 {
-    /**
-     * Display the registration view.
-     */
-    public function create(): View
-    {
-        return view('auth.custom-register');
-    }
+	/**
+	 * Display the registration view.
+	 */
+	public function create(): View
+	{
+		return view('auth.custom-register');
+	}
 
-    /**
-     * Handle an incoming registration request.
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
-    public function store(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-        ]);
+	/**
+	 * Handle an incoming registration request.
+	 *
+	 * @throws \Illuminate\Validation\ValidationException
+	 */
+	public function store(Request $request): RedirectResponse
+	{
+		$request->validate([
+			'name' => ['required', 'string', 'max:255'],
+			'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
+			'password' => ['required', 'confirmed', Rules\Password::defaults()],
+		]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+		try {
+			$user = User::create([
+				'name' => $request->name,
+				'email' => $request->email,
+				'password' => Hash::make($request->password),
+			]);
+		} catch (\Illuminate\Database\QueryException $e) {
+			if ($e->getCode() === '23505') { // doublon email (PostgreSQL)
+				return back()
+					->withInput()
+					->withErrors(['email' => 'Cet email est déjà utilisé.']);
+			}
+			throw $e;
+		}
 
-        event(new Registered($user));
 
-        Auth::login($user);
+		event(new Registered($user));
 
-        return redirect()->route('home');
-    }
+		Auth::login($user);
+
+		return redirect()->route('home');
+	}
 }
 
 
@@ -1604,33 +1614,39 @@ $width = match ($width) {
 
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+    <title>{{ config('app.name', 'Laravel') }}</title>
 
-        <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="font-sans text-gray-900 antialiased">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
-            <div>
-                <a href="/">
-                    <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
-                </a>
-            </div>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-            <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
-                {{ $slot }}
-            </div>
+    <!-- Scripts -->
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Alpine.js -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+
+<body class="font-sans text-gray-900 antialiased">
+    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
+        <div>
+            <a href="/">
+                <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
+            </a>
         </div>
-    </body>
+
+        <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
+            {{ $slot }}
+        </div>
+    </div>
+</body>
+
 </html>
 
 
@@ -1678,16 +1694,33 @@ $width = match ($width) {
 
 # resources/views/layouts/app.blade.php
 
-<!DOCTYPE html><html lang="fr"><head>
-  <meta charset="utf-8"><title>Plant Shop</title>
-  @vite('resources/css/orange.css')
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head><body class="bg-light">
-  @include('layouts._navbar')
-  <main class="container my-4">@include('layouts._flash') @yield('content')</main>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  @vite('resources/js/app.js')
-</body></html>
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <title>Plant Shop</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Styles personnalisés -->
+    <link href="{{ asset('css/orange.css') }}" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+    @include('layouts._navbar')
+    <main class="container my-4">
+        @include('layouts._flash')
+        @yield('content')
+    </main>
+    <!-- Alpine.js -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Scripts personnalisés -->
+    <script src="{{ asset('js/cart.js') }}" defer></script>
+</body>
+
+</html>
 
 
 # resources/views/layouts/navigation.blade.php
@@ -2173,22 +2206,18 @@ $width = match ($width) {
 <h1>Connexion</h1>
 <form method="POST" action="{{ route('login') }}" class="w-100" style="max-width: 500px">
     @csrf
-
     <div class="mb-3">
         <label class="form-label">Email</label>
         <input name="email" type="email" class="form-control" value="{{ old('email') }}" required autofocus>
     </div>
-
     <div class="mb-3">
         <label class="form-label">Mot de passe</label>
         <input name="password" type="password" class="form-control" required>
     </div>
-
     <div class="mb-3 form-check">
         <input name="remember" type="checkbox" class="form-check-input" id="remember">
         <label class="form-check-label" for="remember">Se souvenir de moi</label>
     </div>
-
     <button type="submit" class="btn btn-primary">Se connecter</button>
 </form>
 @endsection
@@ -2367,361 +2396,364 @@ $width = match ($width) {
 @endsection
 
 
-# resources/js/app.js
-
-import './bootstrap';
-import './cart.js';
-
-import Alpine from 'alpinejs';
-
-window.Alpine = Alpine;
-
-Alpine.start();
-
-
-# resources/js/bootstrap.js
-
-import axios from 'axios';
-window.axios = axios;
-
-window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-
-
-# resources/js/cart.js
+# public/js/cart.js
 
 class Cart {
-  /**
-   * Récupère le panier depuis localStorage.
-   * @returns {Object} contenu du panier
-   */
-  get() {
-    try {
-      return JSON.parse(localStorage.getItem("cart") || "{}");
-    } catch (e) {
-      console.error("Erreur JSON", e);
-      return {};
-    }
-  }
-
-  /**
-   * Sauvegarde le panier dans localStorage.
-   * @param {Object} cart contenu à enregistrer
-   */
-  save(cart) {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }
-
-  /**
-   * Ajoute un article au panier.
-   * @param {number} id identifiant
-   * @param {string} name nom
-   * @param {number} price prix
-   * @param {number} stock disponible
-   */
-  add(id, name, price, stock) {
-    const cart = this.get();
-    if (cart[id]) {
-      cart[id].quantity += 1;
-    } else {
-      cart[id] = { id, name, price, quantity: 1, stock };
-    }
-    this.save(cart);
-    this.updateNavbarCount();
-  }
-
-  /**
-   * Met à jour une quantité.
-   * @param {number} id identifiant
-   * @param {number|string} newQty quantité cible
-   */
-  update(id, newQty) {
-    const qty = parseInt(newQty);
-    if (isNaN(qty)) return;
-
-    const cart = this.get();
-    if (!cart[id]) return;
-
-    const input = document.querySelector(`input[data-cart-id="${id}"]`);
-    const stock = parseInt(input?.dataset?.stock) || 1;
-
-    let correctedQty = Math.max(1, Math.min(qty, stock));
-    cart[id].quantity = correctedQty;
-    if (input) input.value = correctedQty;
-
-    this.save(cart);
-    this.render();
-  }
-
-  /**
-   * Met à jour avec temporisation.
-   * @param {number} id identifiant
-   * @param {HTMLInputElement} inputElem champ quantité
-   */
-  delayedUpdate(id, inputElem) {
-    clearTimeout(inputElem._cartTimer);
-    inputElem._cartTimer = setTimeout(() => {
-      this.update(id, inputElem.value);
-    }, 300);
-  }
-
-  /**
-   * Supprime un article.
-   * @param {number} id identifiant
-   */
-  remove(id) {
-    const cart = this.get();
-    delete cart[id];
-    this.save(cart);
-    this.render();
-  }
-
-  /**
-   * Vide complètement le panier.
-   */
-  clear() {
-    localStorage.removeItem("cart");
-    this.render();
-  }
-
-  /**
-   * Met à jour le compteur dans la navbar.
-   */
-  updateNavbarCount() {
-    console.log("updateNavbarCount");
-    const cart = this.get();
-    const count = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0);
-    const link = document.getElementById("cart-link");
-    if (link) {
-      link.innerText = `Mon Panier${count > 0 ? ` (${count})` : ""}`;
-    }
-  }
-
-  /**
-   * Rendu du panier complet.
-   */
-  render() {
-    const container = document.getElementById("cart-container");
-    if (!container) return;
-
-    const cart = this.get();
-    container.innerHTML = "";
-
-    this.updateNavbarCount();
-
-    if (Object.keys(cart).length === 0) {
-      const alert = document.createElement("p");
-      alert.className = "alert alert-info";
-      alert.textContent = "Votre panier est vide.";
-      container.appendChild(alert);
-      return;
+    /**
+     * Récupère le panier depuis localStorage.
+     * @returns {Object} contenu du panier
+     */
+    get() {
+        try {
+            return JSON.parse(localStorage.getItem("cart") || "{}");
+        } catch (e) {
+            console.error("Erreur JSON", e);
+            return {};
+        }
     }
 
-    const table = document.createElement("table");
-    table.className = "table";
-
-    const thead = document.createElement("thead");
-    thead.className = "table-dark";
-    const headerRow = document.createElement("tr");
-    ["Plante", "Quantité", "Action"].forEach(text => {
-      const th = document.createElement("th");
-      th.textContent = text;
-      headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-    let total = 0;
-
-    for (const id in cart) {
-      const item = cart[id];
-      total += item.price * item.quantity;
-
-      const row = document.createElement("tr");
-
-      const tdName = document.createElement("td");
-      const link = document.createElement("a");
-      link.href = `/plants/${id}`;
-      link.className = "text-decoration-none";
-      link.textContent = item.name;
-      tdName.appendChild(link);
-
-      const tdQty = document.createElement("td");
-      const input = document.createElement("input");
-      input.type = "number";
-      input.min = "1";
-      input.className = "form-control form-control-sm";
-      input.style.maxWidth = "70px";
-      input.value = item.quantity;
-      input.dataset.cartId = id;
-      input.dataset.stock = item.stock;
-      input.oninput = () => this.delayedUpdate(id, input);
-      tdQty.appendChild(input);
-
-      const tdAction = document.createElement("td");
-      const btn = document.createElement("button");
-      btn.className = "btn btn-danger btn-sm";
-      btn.textContent = "Retirer";
-      btn.onclick = () => this.remove(id);
-      tdAction.appendChild(btn);
-
-      row.appendChild(tdName);
-      row.appendChild(tdQty);
-      row.appendChild(tdAction);
-      tbody.appendChild(row);
+    /**
+     * Sauvegarde le panier dans localStorage.
+     * @param {Object} cart contenu à enregistrer
+     */
+    save(cart) {
+        localStorage.setItem("cart", JSON.stringify(cart));
     }
 
-    table.appendChild(tbody);
-    container.appendChild(table);
+    /**
+     * Ajoute un article au panier.
+     * @param {number} id identifiant
+     * @param {string} name nom
+     * @param {number} price prix
+     * @param {number} stock disponible
+     */
+    add(id, name, price, stock) {
+        const cart = this.get();
+        if (cart[id]) {
+            cart[id].quantity += 1;
+        } else {
+            cart[id] = { id, name, price, quantity: 1, stock };
+        }
+        this.save(cart);
+        this.updateNavbarCount();
+    }
 
-    const totalEl = document.createElement("p");
-    totalEl.className = "text-end fw-bold";
-    totalEl.textContent = `Total : ${total} €`;
-    container.appendChild(totalEl);
+    /**
+     * Met à jour une quantité.
+     * @param {number} id identifiant
+     * @param {number|string} newQty quantité cible
+     */
+    update(id, newQty) {
+        const qty = parseInt(newQty);
+        if (isNaN(qty)) return;
 
-    const actionsDiv = document.createElement("div");
-    actionsDiv.className = "d-flex justify-content-between";
+        const cart = this.get();
+        if (!cart[id]) return;
 
-    const clearBtn = document.createElement("button");
-    clearBtn.className = "btn btn-outline-secondary btn-sm";
-    clearBtn.textContent = "Vider le panier";
-    clearBtn.onclick = () => this.clear();
+        const input = document.querySelector(`input[data-cart-id="${id}"]`);
+        const stock = parseInt(input?.dataset?.stock) || 1;
 
-    const checkoutLink = document.createElement("a");
-    checkoutLink.href = "/orders/create";
-    checkoutLink.className = "btn btn-primary";
-    checkoutLink.textContent = "Passer la commande";
+        let correctedQty = Math.max(1, Math.min(qty, stock));
+        cart[id].quantity = correctedQty;
+        if (input) input.value = correctedQty;
 
-    actionsDiv.appendChild(clearBtn);
-    actionsDiv.appendChild(checkoutLink);
-    container.appendChild(actionsDiv);
-  }
+        this.save(cart);
+        this.render();
+    }
 
-  /**
-   * Affiche le récapitulatif de commande.
-   * @param {string} containerId ID du conteneur
-   * @param {string} inputId ID du champ input
-   */
-  renderOrderReview(containerId = "order-review-container", inputId = "order-items-input") {
-    const container = document.getElementById(containerId);
-    const input = document.getElementById(inputId);
-    const cart = this.get();
+    /**
+     * Met à jour avec temporisation.
+     * @param {number} id identifiant
+     * @param {HTMLInputElement} inputElem champ quantité
+     */
+    delayedUpdate(id, inputElem) {
+        clearTimeout(inputElem._cartTimer);
+        inputElem._cartTimer = setTimeout(() => {
+            this.update(id, inputElem.value);
+        }, 300);
+    }
 
-    if (
-      document.querySelector(".alert-success") ||
-      document.querySelector(".alert-danger")
+    /**
+     * Supprime un article.
+     * @param {number} id identifiant
+     */
+    remove(id) {
+        const cart = this.get();
+        delete cart[id];
+        this.save(cart);
+        this.render();
+    }
+
+    /**
+     * Vide complètement le panier.
+     */
+    clear() {
+        localStorage.removeItem("cart");
+        this.render();
+    }
+
+    /**
+     * Met à jour le compteur dans la navbar.
+     */
+    updateNavbarCount() {
+        // console.log("updateNavbarCount");
+        const cart = this.get();
+        const count = Object.values(cart).reduce(
+            (sum, item) => sum + item.quantity,
+            0,
+        );
+        const link = document.getElementById("cart-link");
+        if (link) {
+            link.innerText = `Mon Panier${count > 0 ? ` (${count})` : ""}`;
+        }
+    }
+
+    /**
+     * Rendu du panier complet.
+     */
+    render() {
+        const container = document.getElementById("cart-container");
+        if (!container) return;
+
+        const cart = this.get();
+        container.innerHTML = "";
+
+        this.updateNavbarCount();
+
+        if (Object.keys(cart).length === 0) {
+            const alert = document.createElement("p");
+            alert.className = "alert alert-info";
+            alert.textContent = "Votre panier est vide.";
+            container.appendChild(alert);
+            return;
+        }
+
+        const table = document.createElement("table");
+        table.className = "table";
+
+        const thead = document.createElement("thead");
+        thead.className = "table-dark";
+        const headerRow = document.createElement("tr");
+        ["Plante", "Quantité", "Action"].forEach((text) => {
+            const th = document.createElement("th");
+            th.textContent = text;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        let total = 0;
+
+        for (const id in cart) {
+            const item = cart[id];
+            total += item.price * item.quantity;
+
+            const row = document.createElement("tr");
+
+            const tdName = document.createElement("td");
+            const link = document.createElement("a");
+            link.href = `/plants/${id}`;
+            link.className = "text-decoration-none";
+            link.textContent = item.name;
+            tdName.appendChild(link);
+
+            const tdQty = document.createElement("td");
+            const input = document.createElement("input");
+            input.type = "number";
+            input.min = "1";
+            input.className = "form-control form-control-sm";
+            input.style.maxWidth = "70px";
+            input.value = item.quantity;
+            input.dataset.cartId = id;
+            input.dataset.stock = item.stock;
+            input.oninput = () => this.delayedUpdate(id, input);
+            tdQty.appendChild(input);
+
+            const tdAction = document.createElement("td");
+            const btn = document.createElement("button");
+            btn.className = "btn btn-danger btn-sm";
+            btn.textContent = "Retirer";
+            btn.onclick = () => this.remove(id);
+            tdAction.appendChild(btn);
+
+            row.appendChild(tdName);
+            row.appendChild(tdQty);
+            row.appendChild(tdAction);
+            tbody.appendChild(row);
+        }
+
+        table.appendChild(tbody);
+        container.appendChild(table);
+
+        const totalEl = document.createElement("p");
+        totalEl.className = "text-end fw-bold";
+        totalEl.textContent = `Total : ${total} €`;
+        container.appendChild(totalEl);
+
+        const actionsDiv = document.createElement("div");
+        actionsDiv.className = "d-flex justify-content-between";
+
+        const clearBtn = document.createElement("button");
+        clearBtn.className = "btn btn-outline-secondary btn-sm";
+        clearBtn.textContent = "Vider le panier";
+        clearBtn.onclick = () => this.clear();
+
+        const checkoutLink = document.createElement("a");
+        checkoutLink.href = "/orders/create";
+        checkoutLink.className = "btn btn-primary";
+        checkoutLink.textContent = "Passer la commande";
+
+        actionsDiv.appendChild(clearBtn);
+        actionsDiv.appendChild(checkoutLink);
+        container.appendChild(actionsDiv);
+    }
+
+    /**
+     * Affiche le récapitulatif de commande.
+     * @param {string} containerId ID du conteneur
+     * @param {string} inputId ID du champ input
+     */
+    renderOrderReview(
+        containerId = "order-review-container",
+        inputId = "order-items-input",
     ) {
-      container.innerHTML = "";
-      return;
+        const container = document.getElementById(containerId);
+        const input = document.getElementById(inputId);
+        const cart = this.get();
+
+        if (
+            document.querySelector(".alert-success") ||
+            document.querySelector(".alert-danger")
+        ) {
+            container.innerHTML = "";
+            return;
+        }
+
+        if (!container || !input) return;
+
+        if (Object.keys(cart).length === 0) {
+            const alert = document.createElement("p");
+            alert.className = "alert alert-warning";
+            alert.textContent = "Votre panier est vide.";
+            container.innerHTML = "";
+            container.appendChild(alert);
+            input.value = "";
+            return;
+        }
+
+        const table = document.createElement("table");
+        table.className = "table shadow";
+        const thead = document.createElement("thead");
+        thead.className = "table-dark";
+        const headerRow = document.createElement("tr");
+        ["Plante", "Quantité", "Total"].forEach((text) => {
+            const th = document.createElement("th");
+            th.textContent = text;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        let total = 0;
+        const items = [];
+
+        for (const id in cart) {
+            const item = cart[id];
+            const subtotal = item.price * item.quantity;
+            total += subtotal;
+
+            const row = document.createElement("tr");
+
+            const tdName = document.createElement("td");
+            const link = document.createElement("a");
+            link.href = `/plants/${item.id}`;
+            link.className = "cart-plant-link";
+            link.textContent = item.name;
+            tdName.appendChild(link);
+
+            const tdQty = document.createElement("td");
+            tdQty.textContent = item.quantity;
+
+            const tdTotal = document.createElement("td");
+            tdTotal.textContent = `${subtotal} €`;
+
+            row.appendChild(tdName);
+            row.appendChild(tdQty);
+            row.appendChild(tdTotal);
+
+            tbody.appendChild(row);
+
+            items.push({ plant_id: parseInt(id), quantity: item.quantity });
+        }
+
+        table.appendChild(tbody);
+        container.innerHTML = "";
+        container.appendChild(table);
+
+        const totalEl = document.createElement("p");
+        totalEl.className = "text-end fw-bold";
+        totalEl.textContent = `Total : ${total} €`;
+        container.appendChild(totalEl);
+
+        input.value = JSON.stringify(items);
     }
-
-    if (!container || !input) return;
-
-    if (Object.keys(cart).length === 0) {
-      const alert = document.createElement("p");
-      alert.className = "alert alert-warning";
-      alert.textContent = "Votre panier est vide.";
-      container.innerHTML = "";
-      container.appendChild(alert);
-      input.value = "";
-      return;
-    }
-
-    const table = document.createElement("table");
-    table.className = "table shadow";
-    const thead = document.createElement("thead");
-    thead.className = "table-dark";
-    const headerRow = document.createElement("tr");
-    ["Plante", "Quantité", "Total"].forEach(text => {
-      const th = document.createElement("th");
-      th.textContent = text;
-      headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-    let total = 0;
-    const items = [];
-
-    for (const id in cart) {
-      const item = cart[id];
-      const subtotal = item.price * item.quantity;
-      total += subtotal;
-
-      const row = document.createElement("tr");
-
-      const tdName = document.createElement("td");
-      const link = document.createElement("a");
-      link.href = `/plants/${item.id}`;
-      link.className = "cart-plant-link";
-      link.textContent = item.name;
-      tdName.appendChild(link);
-
-      const tdQty = document.createElement("td");
-      tdQty.textContent = item.quantity;
-
-      const tdTotal = document.createElement("td");
-      tdTotal.textContent = `${subtotal} €`;
-
-      row.appendChild(tdName);
-      row.appendChild(tdQty);
-      row.appendChild(tdTotal);
-
-      tbody.appendChild(row);
-
-      items.push({ plant_id: parseInt(id), quantity: item.quantity });
-    }
-
-    table.appendChild(tbody);
-    container.innerHTML = "";
-    container.appendChild(table);
-
-    const totalEl = document.createElement("p");
-    totalEl.className = "text-end fw-bold";
-    totalEl.textContent = `Total : ${total} €`;
-    container.appendChild(totalEl);
-
-    input.value = JSON.stringify(items);
-  }
 }
 
 /**
  * Ajuste le stock suite à une alerte serveur.
  */
 function applyStockAdjustmentFromAlert() {
-  const alert = document.querySelector("[data-stock-adjust]");
-  if (!alert) return;
+    const alert = document.querySelector("[data-stock-adjust]");
+    if (!alert) return;
 
-  try {
-    const data = JSON.parse(alert.dataset.stockAdjust);
-    const { id, available } = data;
-    const cart = Cart.get();
+    try {
+        const data = JSON.parse(alert.dataset.stockAdjust);
+        const { id, available } = data;
+        const cart = Cart.get();
 
-    if (available > 0 && cart[id]) {
-      cart[id].quantity = available;
-      cart[id].stock = available;
-    } else {
-      delete cart[id];
+        if (available > 0 && cart[id]) {
+            cart[id].quantity = available;
+            cart[id].stock = available;
+        } else {
+            delete cart[id];
+        }
+
+        Cart.save(cart);
+        Cart.render();
+        Cart.renderOrderReview();
+    } catch (e) {
+        console.error("Erreur ajustement stock :", e);
     }
-
-    Cart.save(cart);
-    Cart.render();
-    Cart.renderOrderReview();
-  } catch (e) {
-    console.error("Erreur ajustement stock :", e);
-  }
 }
-
 // Initialisation
 window.Cart = new Cart();
 
 document.addEventListener("DOMContentLoaded", () => {
-  window.Cart.updateNavbarCount();
-  window.Cart.render();
-  window.Cart.renderOrderReview();
-  applyStockAdjustmentFromAlert();
+    if (typeof window.Cart.add === "function") {
+        console.log("Cart.add is accessible.");
+    } else {
+        console.error("Cart.add is NOT accessible.");
+    }
+    window.Cart.updateNavbarCount();
+    window.Cart.render();
+    window.Cart.renderOrderReview();
+    applyStockAdjustmentFromAlert();
+    console.log("Cart is loaded:", window.Cart);
 });
+
+
+# public/css/orange.css
+
+.btn-primary, .table-primary, .bg-primary{ --bs-primary: #ff7f32!important; }
+.card, .table { border-radius: .75rem!important; }
+.navbar-custom {
+	background-color: #de9a07db !important;
+}
+.navbar-nav .nav-link {
+  color: rgb(255, 240, 164) !important;
+}
 
 ==== STRUCTURE DU PROJET (filtres appliqués) ====
 ./
@@ -2846,21 +2878,16 @@ document.addEventListener("DOMContentLoaded", () => {
 ├── .gitattributes
 ├── .gitignore
 ├── Makefile
-├── package.json
-├── package-lock.json
 ├── phpunit.xml
-├── postcss.config.js
 ├── projet.txt
 ├── public/
-│   ├── build/
-│   │   ├── assets/
-│   │   │   ├── app-BuvcaiTF.css
-│   │   │   ├── app-CzBGtjEM.js
-│   │   │   └── orange-NDs0pG5x.css
-│   │   └── manifest.json
+│   ├── css/
+│   │   └── orange.css
 │   ├── favicon.ico
 │   ├── .htaccess
 │   ├── index.php
+│   ├── js/
+│   │   └── cart.js
 │   ├── plantshop - content.ico:Zone.Identifier
 │   ├── robots.txt
 │   └── svg/
@@ -2870,12 +2897,7 @@ document.addEventListener("DOMContentLoaded", () => {
 ├── README.md
 ├── resources/
 │   ├── css/
-│   │   ├── app.css
-│   │   └── orange.css
-│   ├── js/
-│   │   ├── app.js
-│   │   ├── bootstrap.js
-│   │   └── cart.js
+│   │   └── app.css
 │   └── views/
 │       ├── admin/
 │       │   ├── plants/
@@ -2943,7 +2965,6 @@ document.addEventListener("DOMContentLoaded", () => {
 │   ├── console.php
 │   └── web.php
 ├── script.sh*
-├── tailwind.config.js
 ├── tests/
 │   ├── Feature/
 │   │   ├── Auth/
@@ -2958,7 +2979,6 @@ document.addEventListener("DOMContentLoaded", () => {
 │   ├── TestCase.php
 │   └── Unit/
 │       └── ExampleTest.php
-├── users.txt
-└── vite.config.js
+└── users.txt
 
-59 directories, 177 files
+58 directories, 166 files

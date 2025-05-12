@@ -12,17 +12,19 @@
             <button class="btn btn-success w-100 rounded-3">Confirmer la commande</button>
         </form>
     @else
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                @if (session('success'))
-                    // console.log("Commande réussie : vidage du panier.");
-                    if (typeof Cart !== "undefined") Cart.clear();
+        @if (session('success'))
+            <div id="order-success" data-clear-cart></div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
                     window.location.href = "{{ route('orders.index') }}";
-                @elseif (session('error'))
-                    // console.error("Erreur détectée : redirection vers le panier.");
+                });
+            </script>
+        @elseif (session('error'))
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
                     window.location.href = "{{ route('carts.index') }}";
-                @endif
-            });
-        </script>
+                });
+            </script>
+        @endif
     @endif
 @endsection

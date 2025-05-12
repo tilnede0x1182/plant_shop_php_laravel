@@ -20,8 +20,8 @@
                             @endauth
                         </p>
                         <button class="btn btn-success w-100 rounded-3"
-                            onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }}, {{ $plant->stock }})">Ajouter
-                            au panier</button>
+                            onclick="window.Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }}, {{ $plant->stock }})">
+                            Ajouter au panier</button>
                     </div>
                 </div>
             </div>
