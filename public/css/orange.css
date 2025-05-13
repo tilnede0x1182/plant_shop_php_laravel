@@ -1,8 +1,12 @@
-.btn-primary, .table-primary, .bg-primary{ --bs-primary: #ff7f32!important; }
-.card, .table { border-radius: .75rem!important; }
-.navbar-custom {
-	background-color: #de9a07db !important;
+.nav-bar-color {
+    background-color: #de9a07;
 }
-.navbar-nav .nav-link {
-  color: rgb(255, 240, 164) !important;
+
+.nav-bar-buttons-color {
+    color: rgb(255, 240, 164);
+    transition: color ease;
+}
+
+.nav-bar-buttons-color:hover {
+    color: rgb(100, 66, 41);
 }
