@@ -12,10 +12,6 @@
         <label class="form-label">Mot de passe</label>
         <input name="password" type="password" class="form-control" required>
     </div>
-    <div class="mb-3 form-check">
-        <input name="remember" type="checkbox" class="form-check-input" id="remember">
-        <label class="form-check-label" for="remember">Se souvenir de moi</label>
-    </div>
     <button type="submit" class="btn btn-primary">Se connecter</button>
 </form>
 @endsection

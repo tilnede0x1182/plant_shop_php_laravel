@@ -1,2403 +1,4 @@
-==== FICHIERS UTILES DU PROJET LARAVEL (avec contenu) ====
-
-# routes/auth.php
-
-<?php
-
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\ConfirmablePasswordController;
-use App\Http\Controllers\Auth\EmailVerificationNotificationController;
-use App\Http\Controllers\Auth\EmailVerificationPromptController;
-use App\Http\Controllers\Auth\NewPasswordController;
-use App\Http\Controllers\Auth\PasswordController;
-use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Http\Controllers\Auth\VerifyEmailController;
-use Illuminate\Support\Facades\Route;
-
-Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
-
-    Route::post('register', [RegisteredUserController::class, 'store']);
-
-    Route::get('login', [AuthenticatedSessionController::class, 'create'])
-        ->name('login');
-
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
-
-    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
-        ->name('password.request');
-
-    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
-        ->name('password.email');
-
-    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
-        ->name('password.reset');
-
-    Route::post('reset-password', [NewPasswordController::class, 'store'])
-        ->name('password.store');
-});
-
-Route::middleware('auth')->group(function () {
-    Route::get('verify-email', EmailVerificationPromptController::class)
-        ->name('verification.notice');
-
-    Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
-        ->middleware(['signed', 'throttle:6,1'])
-        ->name('verification.verify');
-
-    Route::post('email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
-        ->middleware('throttle:6,1')
-        ->name('verification.send');
-
-    Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
-        ->name('password.confirm');
-
-    Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
-
-    Route::put('password', [PasswordController::class, 'update'])->name('password.update');
-
-    Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
-        ->name('logout');
-});
-
-
-# routes/console.php
-
-<?php
-
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
-
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
-
-
-# routes/web.php
-
-<?php
-
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\PlantsController;
-use App\Http\Controllers\OrdersController;
-use App\Http\Controllers\UsersController;
-use App\Http\Controllers\CartController;
-use App\Http\Controllers\Admin\PlantsController as AdminPlantsController;
-use App\Http\Controllers\Admin\UsersController as AdminUsersController;
-
-Route::get('/', [PlantsController::class, 'index'])->name('home');
-
-Route::middleware(['auth'])->group(function () {
-    Route::resource('orders', OrdersController::class)->only(['index', 'create', 'store']);
-    Route::resource('users', UsersController::class)->only(['show', 'edit', 'update']);
-});
-
-Route::resource('plants', PlantsController::class)->only(['index', 'show']);
-
-Route::get('/carts', [CartController::class, 'index'])->name('carts.index');
-
-Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
-    Route::resource('plants', AdminPlantsController::class)->except(['show']);
-    Route::resource('users', AdminUsersController::class)->only(['index', 'show', 'edit', 'update', 'destroy']);
-});
-
-require __DIR__.'/auth.php';
-
-
-# database/migrations/2025_05_02_190618_create_sessions_table.php
-
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('sessions', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->foreignId('user_id')->nullable()->index();
-            $table->string('ip_address', 45)->nullable();
-            $table->text('user_agent')->nullable();
-            $table->longText('payload');
-            $table->integer('last_activity')->index();
-        });
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('sessions');
-    }
-};
-
-
-# database/migrations/2025_05_02_162735_setup_all_tables.php
-
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void
-    {
-        Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
-            $table->boolean('admin')->default(false);
-            $table->rememberToken();
-            $table->timestamps();
-        });
-
-        Schema::create('plants', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->integer('price');
-            $table->text('description')->nullable();
-            $table->integer('stock');
-            $table->timestamps();
-        });
-
-        Schema::create('orders', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->integer('total_price')->default(0);
-            $table->string('status');
-            $table->timestamps();
-        });
-
-        Schema::create('order_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('order_id')->constrained()->onDelete('cascade');
-            $table->foreignId('plant_id')->constrained()->onDelete('cascade');
-            $table->integer('quantity');
-            $table->timestamps();
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('order_items');
-        Schema::dropIfExists('orders');
-        Schema::dropIfExists('plants');
-        Schema::dropIfExists('users');
-    }
-};
-
-
-# app/Models/User.php
-
-<?php
-
-namespace App\Models;
-
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Notifications\Notifiable;
-
-class User extends Authenticatable
-{
-	/** @use HasFactory<\Database\Factories\UserFactory> */
-	use HasFactory, Notifiable;
-
-	/**
-	 * The attributes that are mass assignable.
-	 *
-	 * @var list<string>
-	 */
-	protected $fillable = [
-		'name',
-		'email',
-		'password',
-    'admin',
-	];
-
-	/**
-	 * The attributes that should be hidden for serialization.
-	 *
-	 * @var list<string>
-	 */
-	protected $hidden = [
-		'password',
-		'remember_token',
-	];
-
-	/**
-	 * Get the attributes that should be cast.
-	 *
-	 * @return array<string, string>
-	 */
-	protected function casts(): array
-	{
-		return [
-			'email_verified_at' => 'datetime',
-			'password' => 'hashed',
-		];
-	}
-
-	public function orders(): HasMany
-	{
-		return $this->hasMany(Order::class);
-	}
-}
-
-
-# app/Models/Models/User.php
-
-<?php
-
-namespace App\Models\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class User extends Model
-{
-    //
-}
-
-
-# app/Models/Models/Order.php
-
-<?php
-
-namespace App\Models\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class Order extends Model
-{
-    //
-}
-
-
-# app/Models/Models/OrderItem.php
-
-<?php
-
-namespace App\Models\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class OrderItem extends Model
-{
-    //
-}
-
-
-# app/Models/Models/Plant.php
-
-<?php
-
-namespace App\Models\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class Plant extends Model
-{
-    //
-}
-
-
-# app/Models/Order.php
-
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
-class Order extends Model
-{
-    protected $fillable = ['user_id', 'total_price', 'status'];
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function orderItems(): HasMany
-    {
-        return $this->hasMany(OrderItem::class);
-    }
-}
-
-
-# app/Models/OrderItem.php
-
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-class OrderItem extends Model
-{
-    protected $fillable = ['order_id', 'plant_id', 'quantity'];
-
-    public function order(): BelongsTo
-    {
-        return $this->belongsTo(Order::class);
-    }
-
-    public function plant(): BelongsTo
-    {
-        return $this->belongsTo(Plant::class);
-    }
-}
-
-
-# app/Models/Plant.php
-
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
-class Plant extends Model
-{
-    protected $fillable = ['name', 'price', 'description', 'stock'];
-
-    public function orderItems(): HasMany
-    {
-        return $this->hasMany(OrderItem::class);
-    }
-}
-
-
-# app/Http/Controllers/OrdersController.php
-
-<?php
-
-namespace App\Http\Controllers;
-
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Plant;
-use Illuminate\Support\Facades\DB;
-
-class OrdersController extends Controller
-{
-	public function index()
-	{
-		$orders = Auth::user()->orders()->with('orderItems.plant')->get()->each(function ($order) {
-			$order->items = $order->orderItems;
-		});
-		return view('orders.index', compact('orders'));
-	}
-
-	public function create()
-	{
-		return view('orders.new');
-	}
-
-	public function store(Request $request)
-	{
-		$items = json_decode($request->input('items'), true);
-		$total = 0;
-
-		try {
-			DB::beginTransaction();
-
-			// Valider les stocks d'abord
-			foreach ($items as $item) {
-				$plant = Plant::findOrFail($item['plant_id']);
-				$qty = intval($item['quantity']);
-
-				if ($plant->stock < $qty) {
-					DB::rollBack();
-					return redirect()
-						->route('orders.create')
-						->with('error', "Stock insuffisant pour {$plant->name}")
-						->with('stock_adjust', ['id' => $plant->id, 'available' => $plant->stock]);
-				}
-			}
-
-			// Création après validation
-			$order = Order::create([
-				'user_id' => Auth::id(),
-				'status' => 'confirmed',
-				'total_price' => 0,
-			]);
-
-			// Traitement des items
-			foreach ($items as $item) {
-				$plant = Plant::findOrFail($item['plant_id']);
-				$qty = intval($item['quantity']);
-
-				$plant->decrement('stock', $qty);
-				OrderItem::create([
-					'order_id' => $order->id,
-					'plant_id' => $plant->id,
-					'quantity' => $qty,
-				]);
-
-				$total += $plant->price * $qty;
-			}
-
-			$order->update(['total_price' => $total]);
-
-			DB::commit();
-			return redirect()->route('orders.create')->with('success', true);
-		} catch (\Exception $e) {
-			DB::rollBack();
-			return redirect()
-				->route('orders.create')
-				->with('error', "Erreur commande : " . $e->getMessage());
-		}
-	}
-}
-
-
-# app/Http/Controllers/Admin/UsersController.php
-
-<?php
-
-namespace App\Http\Controllers\Admin;
-
-use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Http\Request;
-
-class UsersController extends Controller
-{
-	public function index()
-	{
-		$users = User::orderBy('admin', 'desc')->orderBy('name')->get();
-		return view('admin.users.index', compact('users'));
-	}
-
-	public function show(User $user)
-	{
-		return view('admin.users.show', compact('user'));
-	}
-
-	public function edit(User $user)
-	{
-		return view('admin.users.edit', compact('user'));
-	}
-
-	public function update(Request $request, User $user)
-	{
-		$data = $request->validate([
-			'name' => 'required|string',
-			'email' => 'required|email',
-		]);
-
-		$data['admin'] = $request->has('admin');
-
-		$user->update($data);
-		return redirect()->route('admin.users.index')->with('success', 'Utilisateur mis à jour.');
-	}
-
-	public function destroy(User $user)
-	{
-		$user->delete();
-		return redirect()->route('admin.users.index')->with('success', 'Utilisateur supprimé.');
-	}
-}
-
-
-# app/Http/Controllers/Admin/PlantsController.php
-
-<?php
-
-namespace App\Http\Controllers\Admin;
-
-use App\Http\Controllers\Controller;
-use App\Models\Plant;
-use Illuminate\Http\Request;
-
-class PlantsController extends Controller
-{
-	public function index()
-	{
-		return view('admin.plants.index', ['plants' => Plant::orderBy('name')->get()]);
-	}
-
-	public function create()
-	{
-		return view('admin.plants.create', ['plant' => new Plant()]);
-	}
-
-	public function store(Request $request)
-	{
-		$plant = Plant::create($request->validate([
-			'name' => 'required|string',
-			'price' => 'required|integer',
-			'description' => 'nullable|string',
-			'stock' => 'required|integer',
-		]));
-		return redirect()->route('admin.plants.index');
-	}
-
-	public function edit(Plant $plant)
-	{
-		return view('admin.plants.edit', ['plant' => $plant]);
-	}
-
-	public function update(Request $request, Plant $plant)
-	{
-		$plant->update($request->validate([
-			'name' => 'required|string',
-			'price' => 'required|integer',
-			'description' => 'nullable|string',
-			'stock' => 'required|integer',
-		]));
-		return redirect()->route('admin.plants.index');
-	}
-
-	public function destroy(Plant $plant)
-	{
-		$plant->delete();
-		return redirect()->route('admin.plants.index');
-	}
-}
-
-
-# app/Http/Controllers/Auth/PasswordController.php
-
-<?php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
-
-class PasswordController extends Controller
-{
-    /**
-     * Update the user's password.
-     */
-    public function update(Request $request): RedirectResponse
-    {
-        $validated = $request->validateWithBag('updatePassword', [
-            'current_password' => ['required', 'current_password'],
-            'password' => ['required', Password::defaults(), 'confirmed'],
-        ]);
-
-        $request->user()->update([
-            'password' => Hash::make($validated['password']),
-        ]);
-
-        return back()->with('status', 'password-updated');
-    }
-}
-
-
-# app/Http/Controllers/Auth/RegisteredUserController.php
-
-<?php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Auth\Events\Registered;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
-use Illuminate\View\View;
-
-class RegisteredUserController extends Controller
-{
-	/**
-	 * Display the registration view.
-	 */
-	public function create(): View
-	{
-		return view('auth.custom-register');
-	}
-
-	/**
-	 * Handle an incoming registration request.
-	 *
-	 * @throws \Illuminate\Validation\ValidationException
-	 */
-	public function store(Request $request): RedirectResponse
-	{
-		$request->validate([
-			'name' => ['required', 'string', 'max:255'],
-			'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
-			'password' => ['required', 'confirmed', Rules\Password::defaults()],
-		]);
-
-		try {
-			$user = User::create([
-				'name' => $request->name,
-				'email' => $request->email,
-				'password' => Hash::make($request->password),
-			]);
-		} catch (\Illuminate\Database\QueryException $e) {
-			if ($e->getCode() === '23505') { // doublon email (PostgreSQL)
-				return back()
-					->withInput()
-					->withErrors(['email' => 'Cet email est déjà utilisé.']);
-			}
-			throw $e;
-		}
-
-
-		event(new Registered($user));
-
-		Auth::login($user);
-
-		return redirect()->route('home');
-	}
-}
-
-
-# app/Http/Controllers/Auth/PasswordResetLinkController.php
-
-<?php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Password;
-use Illuminate\View\View;
-
-class PasswordResetLinkController extends Controller
-{
-    /**
-     * Display the password reset link request view.
-     */
-    public function create(): View
-    {
-        return view('auth.forgot-password');
-    }
-
-    /**
-     * Handle an incoming password reset link request.
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
-    public function store(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'email' => ['required', 'email'],
-        ]);
-
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
-
-        return $status == Password::RESET_LINK_SENT
-                    ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
-    }
-}
-
-
-# app/Http/Controllers/Auth/AuthenticatedSessionController.php
-
-<?php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\LoginRequest;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\View\View;
-
-class AuthenticatedSessionController extends Controller
-{
-    /**
-     * Display the login view.
-     */
-    public function create(): View
-    {
-        return view('auth.custom-login');
-    }
-
-    /**
-     * Handle an incoming authentication request.
-     */
-    public function store(LoginRequest $request): RedirectResponse
-    {
-        $request->authenticate();
-
-        $request->session()->regenerate();
-
-        return redirect()->route('home');
-    }
-
-    /**
-     * Destroy an authenticated session.
-     */
-    public function destroy(Request $request): RedirectResponse
-    {
-        Auth::guard('web')->logout();
-
-        $request->session()->invalidate();
-
-        $request->session()->regenerateToken();
-
-        return redirect('/');
-    }
-}
-
-
-# app/Http/Controllers/Auth/VerifyEmailController.php
-
-<?php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use Illuminate\Auth\Events\Verified;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
-use Illuminate\Http\RedirectResponse;
-
-class VerifyEmailController extends Controller
-{
-    /**
-     * Mark the authenticated user's email address as verified.
-     */
-    public function __invoke(EmailVerificationRequest $request): RedirectResponse
-    {
-        if ($request->user()->hasVerifiedEmail()) {
-            return redirect()->intended(route('dashboard', absolute: false).'?verified=1');
-        }
-
-        if ($request->user()->markEmailAsVerified()) {
-            event(new Verified($request->user()));
-        }
-
-        return redirect()->intended(route('dashboard', absolute: false).'?verified=1');
-    }
-}
-
-
-# app/Http/Controllers/Auth/NewPasswordController.php
-
-<?php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Auth\Events\PasswordReset;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rules;
-use Illuminate\View\View;
-
-class NewPasswordController extends Controller
-{
-    /**
-     * Display the password reset view.
-     */
-    public function create(Request $request): View
-    {
-        return view('auth.reset-password', ['request' => $request]);
-    }
-
-    /**
-     * Handle an incoming new password request.
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
-    public function store(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'token' => ['required'],
-            'email' => ['required', 'email'],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-        ]);
-
-        // Here we will attempt to reset the user's password. If it is successful we
-        // will update the password on an actual user model and persist it to the
-        // database. Otherwise we will parse the error and return the response.
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user) use ($request) {
-                $user->forceFill([
-                    'password' => Hash::make($request->password),
-                    'remember_token' => Str::random(60),
-                ])->save();
-
-                event(new PasswordReset($user));
-            }
-        );
-
-        // If the password was successfully reset, we will redirect the user back to
-        // the application's home authenticated view. If there is an error we can
-        // redirect them back to where they came from with their error message.
-        return $status == Password::PASSWORD_RESET
-                    ? redirect()->route('login')->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
-    }
-}
-
-
-# app/Http/Controllers/Auth/EmailVerificationNotificationController.php
-
-<?php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-
-class EmailVerificationNotificationController extends Controller
-{
-    /**
-     * Send a new email verification notification.
-     */
-    public function store(Request $request): RedirectResponse
-    {
-        if ($request->user()->hasVerifiedEmail()) {
-            return redirect()->intended(route('dashboard', absolute: false));
-        }
-
-        $request->user()->sendEmailVerificationNotification();
-
-        return back()->with('status', 'verification-link-sent');
-    }
-}
-
-
-# app/Http/Controllers/Auth/EmailVerificationPromptController.php
-
-<?php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\View\View;
-
-class EmailVerificationPromptController extends Controller
-{
-    /**
-     * Display the email verification prompt.
-     */
-    public function __invoke(Request $request): RedirectResponse|View
-    {
-        return $request->user()->hasVerifiedEmail()
-                    ? redirect()->intended(route('dashboard', absolute: false))
-                    : view('auth.verify-email');
-    }
-}
-
-
-# app/Http/Controllers/Auth/ConfirmablePasswordController.php
-
-<?php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
-
-class ConfirmablePasswordController extends Controller
-{
-    /**
-     * Show the confirm password view.
-     */
-    public function show(): View
-    {
-        return view('auth.confirm-password');
-    }
-
-    /**
-     * Confirm the user's password.
-     */
-    public function store(Request $request): RedirectResponse
-    {
-        if (! Auth::guard('web')->validate([
-            'email' => $request->user()->email,
-            'password' => $request->password,
-        ])) {
-            throw ValidationException::withMessages([
-                'password' => __('auth.password'),
-            ]);
-        }
-
-        $request->session()->put('auth.password_confirmed_at', time());
-
-        return redirect()->intended(route('dashboard', absolute: false));
-    }
-}
-
-
-# app/Http/Controllers/UsersController.php
-
-<?php
-
-namespace App\Http\Controllers;
-
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use App\Models\User;
-
-class UsersController extends Controller
-{
-    public function show(User $user) {
-        abort_unless(Auth::id() === $user->id, 403);
-        return view('users.show', compact('user'));
-    }
-
-    public function edit(User $user) {
-        abort_unless(Auth::id() === $user->id, 403);
-        return view('users.edit', compact('user'));
-    }
-
-    public function update(Request $request, User $user) {
-        abort_unless(Auth::id() === $user->id, 403);
-
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email',
-        ]);
-
-        $user->update($data);
-
-        return redirect()->route('users.show', $user)->with('success', 'Profil mis à jour.');
-    }
-}
-
-
-# app/Http/Controllers/ProfileController.php
-
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Http\Requests\ProfileUpdateRequest;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redirect;
-use Illuminate\View\View;
-
-class ProfileController extends Controller
-{
-    /**
-     * Display the user's profile form.
-     */
-    public function edit(Request $request): View
-    {
-        return view('profile.edit', [
-            'user' => $request->user(),
-        ]);
-    }
-
-    /**
-     * Update the user's profile information.
-     */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
-    {
-        $request->user()->fill($request->validated());
-
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
-        }
-
-        $request->user()->save();
-
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
-    }
-
-    /**
-     * Delete the user's account.
-     */
-    public function destroy(Request $request): RedirectResponse
-    {
-        $request->validateWithBag('userDeletion', [
-            'password' => ['required', 'current_password'],
-        ]);
-
-        $user = $request->user();
-
-        Auth::logout();
-
-        $user->delete();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return Redirect::to('/');
-    }
-}
-
-
-# app/Http/Controllers/Controller.php
-
-<?php
-
-namespace App\Http\Controllers;
-
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Foundation\Bus\DispatchesJobs;
-use Illuminate\Foundation\Validation\ValidatesRequests;
-use Illuminate\Routing\Controller as BaseController;
-
-class Controller extends BaseController
-{
-    use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
-}
-
-
-# app/Http/Controllers/PlantsController.php
-
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Models\Plant;
-use Illuminate\Http\Request;
-
-class PlantsController extends Controller
-{
-    public function index()
-    {
-			return view('plants.index', ['plants' => Plant::where('stock', '>', 0)->orderBy('name')->get()]);
-    }
-
-    public function show(Plant $plant)
-    {
-        return view('plants.show', ['plant' => $plant]);
-    }
-}
-
-
-# app/Http/Controllers/CartController.php
-
-<?php
-
-namespace App\Http\Controllers;
-
-use Illuminate\Http\Request;
-
-class CartController extends Controller
-{
-    public function index()
-    {
-        return view('carts.index');
-    }
-}
-
-
-# resources/views/components/application-logo.blade.php
-
-<svg viewBox="0 0 316 316" xmlns="http://www.w3.org/2000/svg" {{ $attributes }}>
-    <path d="M305.8 81.125C305.77 80.995 305.69 80.885 305.65 80.755C305.56 80.525 305.49 80.285 305.37 80.075C305.29 79.935 305.17 79.815 305.07 79.685C304.94 79.515 304.83 79.325 304.68 79.175C304.55 79.045 304.39 78.955 304.25 78.845C304.09 78.715 303.95 78.575 303.77 78.475L251.32 48.275C249.97 47.495 248.31 47.495 246.96 48.275L194.51 78.475C194.33 78.575 194.19 78.725 194.03 78.845C193.89 78.955 193.73 79.045 193.6 79.175C193.45 79.325 193.34 79.515 193.21 79.685C193.11 79.815 192.99 79.935 192.91 80.075C192.79 80.285 192.71 80.525 192.63 80.755C192.58 80.875 192.51 80.995 192.48 81.125C192.38 81.495 192.33 81.875 192.33 82.265V139.625L148.62 164.795V52.575C148.62 52.185 148.57 51.805 148.47 51.435C148.44 51.305 148.36 51.195 148.32 51.065C148.23 50.835 148.16 50.595 148.04 50.385C147.96 50.245 147.84 50.125 147.74 49.995C147.61 49.825 147.5 49.635 147.35 49.485C147.22 49.355 147.06 49.265 146.92 49.155C146.76 49.025 146.62 48.885 146.44 48.785L93.99 18.585C92.64 17.805 90.98 17.805 89.63 18.585L37.18 48.785C37 48.885 36.86 49.035 36.7 49.155C36.56 49.265 36.4 49.355 36.27 49.485C36.12 49.635 36.01 49.825 35.88 49.995C35.78 50.125 35.66 50.245 35.58 50.385C35.46 50.595 35.38 50.835 35.3 51.065C35.25 51.185 35.18 51.305 35.15 51.435C35.05 51.805 35 52.185 35 52.575V232.235C35 233.795 35.84 235.245 37.19 236.025L142.1 296.425C142.33 296.555 142.58 296.635 142.82 296.725C142.93 296.765 143.04 296.835 143.16 296.865C143.53 296.965 143.9 297.015 144.28 297.015C144.66 297.015 145.03 296.965 145.4 296.865C145.5 296.835 145.59 296.775 145.69 296.745C145.95 296.655 146.21 296.565 146.45 296.435L251.36 236.035C252.72 235.255 253.55 233.815 253.55 232.245V174.885L303.81 145.945C305.17 145.165 306 143.725 306 142.155V82.265C305.95 81.875 305.89 81.495 305.8 81.125ZM144.2 227.205L100.57 202.515L146.39 176.135L196.66 147.195L240.33 172.335L208.29 190.625L144.2 227.205ZM244.75 114.995V164.795L226.39 154.225L201.03 139.625V89.825L219.39 100.395L244.75 114.995ZM249.12 57.105L292.81 82.265L249.12 107.425L205.43 82.265L249.12 57.105ZM114.49 184.425L96.13 194.995V85.305L121.49 70.705L139.85 60.135V169.815L114.49 184.425ZM91.76 27.425L135.45 52.585L91.76 77.745L48.07 52.585L91.76 27.425ZM43.67 60.135L62.03 70.705L87.39 85.305V202.545V202.555V202.565C87.39 202.735 87.44 202.895 87.46 203.055C87.49 203.265 87.49 203.485 87.55 203.695V203.705C87.6 203.875 87.69 204.035 87.76 204.195C87.84 204.375 87.89 204.575 87.99 204.745C87.99 204.745 87.99 204.755 88 204.755C88.09 204.905 88.22 205.035 88.33 205.175C88.45 205.335 88.55 205.495 88.69 205.635L88.7 205.645C88.82 205.765 88.98 205.855 89.12 205.965C89.28 206.085 89.42 206.225 89.59 206.325C89.6 206.325 89.6 206.325 89.61 206.335C89.62 206.335 89.62 206.345 89.63 206.345L139.87 234.775V285.065L43.67 229.705V60.135ZM244.75 229.705L148.58 285.075V234.775L219.8 194.115L244.75 179.875V229.705ZM297.2 139.625L253.49 164.795V114.995L278.85 100.395L297.21 89.825V139.625H297.2Z"/>
-</svg>
-
-
-# resources/views/components/input-label.blade.php
-
-@props(['value'])
-
-<label {{ $attributes->merge(['class' => 'block font-medium text-sm text-gray-700']) }}>
-    {{ $value ?? $slot }}
-</label>
-
-
-# resources/views/components/nav-link.blade.php
-
-@props(['active'])
-
-@php
-$classes = ($active ?? false)
-            ? 'inline-flex items-center px-1 pt-1 border-b-2 border-indigo-400 text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-indigo-700 transition duration-150 ease-in-out'
-            : 'inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium leading-5 text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300 transition duration-150 ease-in-out';
-@endphp
-
-<a {{ $attributes->merge(['class' => $classes]) }}>
-    {{ $slot }}
-</a>
-
-
-# resources/views/components/responsive-nav-link.blade.php
-
-@props(['active'])
-
-@php
-$classes = ($active ?? false)
-            ? 'block w-full ps-3 pe-4 py-2 border-l-4 border-indigo-400 text-start text-base font-medium text-indigo-700 bg-indigo-50 focus:outline-none focus:text-indigo-800 focus:bg-indigo-100 focus:border-indigo-700 transition duration-150 ease-in-out'
-            : 'block w-full ps-3 pe-4 py-2 border-l-4 border-transparent text-start text-base font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:text-gray-800 focus:bg-gray-50 focus:border-gray-300 transition duration-150 ease-in-out';
-@endphp
-
-<a {{ $attributes->merge(['class' => $classes]) }}>
-    {{ $slot }}
-</a>
-
-
-# resources/views/components/dropdown-link.blade.php
-
-<a {{ $attributes->merge(['class' => 'block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 transition duration-150 ease-in-out']) }}>{{ $slot }}</a>
-
-
-# resources/views/components/modal.blade.php
-
-@props([
-    'name',
-    'show' => false,
-    'maxWidth' => '2xl'
-])
-
-@php
-$maxWidth = [
-    'sm' => 'sm:max-w-sm',
-    'md' => 'sm:max-w-md',
-    'lg' => 'sm:max-w-lg',
-    'xl' => 'sm:max-w-xl',
-    '2xl' => 'sm:max-w-2xl',
-][$maxWidth];
-@endphp
-
-<div
-    x-data="{
-        show: @js($show),
-        focusables() {
-            // All focusable element types...
-            let selector = 'a, button, input:not([type=\'hidden\']), textarea, select, details, [tabindex]:not([tabindex=\'-1\'])'
-            return [...$el.querySelectorAll(selector)]
-                // All non-disabled elements...
-                .filter(el => ! el.hasAttribute('disabled'))
-        },
-        firstFocusable() { return this.focusables()[0] },
-        lastFocusable() { return this.focusables().slice(-1)[0] },
-        nextFocusable() { return this.focusables()[this.nextFocusableIndex()] || this.firstFocusable() },
-        prevFocusable() { return this.focusables()[this.prevFocusableIndex()] || this.lastFocusable() },
-        nextFocusableIndex() { return (this.focusables().indexOf(document.activeElement) + 1) % (this.focusables().length + 1) },
-        prevFocusableIndex() { return Math.max(0, this.focusables().indexOf(document.activeElement)) -1 },
-    }"
-    x-init="$watch('show', value => {
-        if (value) {
-            document.body.classList.add('overflow-y-hidden');
-            {{ $attributes->has('focusable') ? 'setTimeout(() => firstFocusable().focus(), 100)' : '' }}
-        } else {
-            document.body.classList.remove('overflow-y-hidden');
-        }
-    })"
-    x-on:open-modal.window="$event.detail == '{{ $name }}' ? show = true : null"
-    x-on:close-modal.window="$event.detail == '{{ $name }}' ? show = false : null"
-    x-on:close.stop="show = false"
-    x-on:keydown.escape.window="show = false"
-    x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable().focus()"
-    x-on:keydown.shift.tab.prevent="prevFocusable().focus()"
-    x-show="show"
-    class="fixed inset-0 overflow-y-auto px-4 py-6 sm:px-0 z-50"
-    style="display: {{ $show ? 'block' : 'none' }};"
->
-    <div
-        x-show="show"
-        class="fixed inset-0 transform transition-all"
-        x-on:click="show = false"
-        x-transition:enter="ease-out duration-300"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="ease-in duration-200"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-    >
-        <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-    </div>
-
-    <div
-        x-show="show"
-        class="mb-6 bg-white rounded-lg overflow-hidden shadow-xl transform transition-all sm:w-full {{ $maxWidth }} sm:mx-auto"
-        x-transition:enter="ease-out duration-300"
-        x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-        x-transition:leave="ease-in duration-200"
-        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-        x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-    >
-        {{ $slot }}
-    </div>
-</div>
-
-
-# resources/views/components/danger-button.blade.php
-
-<button {{ $attributes->merge(['type' => 'submit', 'class' => 'inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500 active:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition ease-in-out duration-150']) }}>
-    {{ $slot }}
-</button>
-
-
-# resources/views/components/primary-button.blade.php
-
-<button {{ $attributes->merge(['type' => 'submit', 'class' => 'inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150']) }}>
-    {{ $slot }}
-</button>
-
-
-# resources/views/components/dropdown.blade.php
-
-@props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1 bg-white'])
-
-@php
-$alignmentClasses = match ($align) {
-    'left' => 'ltr:origin-top-left rtl:origin-top-right start-0',
-    'top' => 'origin-top',
-    default => 'ltr:origin-top-right rtl:origin-top-left end-0',
-};
-
-$width = match ($width) {
-    '48' => 'w-48',
-    default => $width,
-};
-@endphp
-
-<div class="relative" x-data="{ open: false }" @click.outside="open = false" @close.stop="open = false">
-    <div @click="open = ! open">
-        {{ $trigger }}
-    </div>
-
-    <div x-show="open"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0 scale-95"
-            x-transition:enter-end="opacity-100 scale-100"
-            x-transition:leave="transition ease-in duration-75"
-            x-transition:leave-start="opacity-100 scale-100"
-            x-transition:leave-end="opacity-0 scale-95"
-            class="absolute z-50 mt-2 {{ $width }} rounded-md shadow-lg {{ $alignmentClasses }}"
-            style="display: none;"
-            @click="open = false">
-        <div class="rounded-md ring-1 ring-black ring-opacity-5 {{ $contentClasses }}">
-            {{ $content }}
-        </div>
-    </div>
-</div>
-
-
-# resources/views/components/text-input.blade.php
-
-@props(['disabled' => false])
-
-<input @disabled($disabled) {{ $attributes->merge(['class' => 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm']) }}>
-
-
-# resources/views/components/secondary-button.blade.php
-
-<button {{ $attributes->merge(['type' => 'button', 'class' => 'inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150']) }}>
-    {{ $slot }}
-</button>
-
-
-# resources/views/components/input-error.blade.php
-
-@props(['messages'])
-
-@if ($messages)
-    <ul {{ $attributes->merge(['class' => 'text-sm text-red-600 space-y-1']) }}>
-        @foreach ((array) $messages as $message)
-            <li>{{ $message }}</li>
-        @endforeach
-    </ul>
-@endif
-
-
-# resources/views/components/auth-session-status.blade.php
-
-@props(['status'])
-
-@if ($status)
-    <div {{ $attributes->merge(['class' => 'font-medium text-sm text-green-600']) }}>
-        {{ $status }}
-    </div>
-@endif
-
-
-# resources/views/admin/plants/_form.blade.php
-
-@php($isEdit = isset($plant))
-<form method="POST" action="{{ $isEdit ? route('admin.plants.update',$plant) : route('admin.plants.store') }}">
-  @csrf @if($isEdit) @method('PUT') @endif
-  <div class="mb-3"><label class="form-label">Nom</label><input class="form-control rounded-3" name="name" value="{{ old('name',$plant->name??'') }}"></div>
-  <div class="mb-3"><label class="form-label">Prix (€)</label><input type="number" class="form-control rounded-3" name="price" value="{{ old('price',$plant->price??'') }}"></div>
-  <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control rounded-3" rows="3" name="description">{{ old('description',$plant->description??'') }}</textarea></div>
-  <div class="mb-3"><label class="form-label">Stock</label><input type="number" class="form-control rounded-3" name="stock" value="{{ old('stock',$plant->stock??'') }}"></div>
-  <button class="btn btn-warning rounded-3">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
-</form>
-
-
-# resources/views/admin/plants/create.blade.php
-
-@extends('layouts.app')
-@section('content')
-<h1>Nouvelle plante</h1>
-@include('admin.plants._form', ['plant' => null])
-@endsection
-
-
-# resources/views/admin/plants/edit.blade.php
-
-@extends('layouts.app')
-@section('content')
-<h1>Modifier la plante</h1>
-@include('admin.plants._form', ['plant' => $plant])
-@endsection
-
-
-# resources/views/admin/plants/index.blade.php
-
-@extends('layouts.app')
-@section('content')
-<h1 class="mb-4">Gestion des plantes</h1>
-<a class="btn btn-warning rounded-3 mb-3" href="{{ route('admin.plants.create') }}">Nouvelle plante</a>
-<table class="table table-warning table-hover rounded-3 overflow-hidden">
-  <thead><tr><th>Nom</th><th>Prix</th><th>Stock</th><th class="text-center">Actions</th></tr></thead><tbody>
-  @foreach($plants as $p)
-    <tr>
-      <td><a class="text-decoration-none text-dark" href="{{ route('plants.show',$p) }}">{{ $p->name }}</a></td>
-      <td>{{ $p->price }} €</td><td>{{ $p->stock }}</td>
-      <td class="text-center">
-        <a class="btn btn-sm btn-outline-dark rounded-3" href="{{ route('admin.plants.edit',$p) }}">✏</a>
-        <form class="d-inline" method="POST" action="{{ route('admin.plants.destroy',$p) }}" onsubmit="return confirm('Supprimer ?')">@csrf @method('DELETE')
-          <button class="btn btn-sm btn-danger rounded-3">🗑</button></form>
-      </td>
-    </tr>
-  @endforeach
-  </tbody>
-</table>
-@endsection
-
-
-# resources/views/admin/users/show.blade.php
-
-@extends('layouts.app')
-@section('content')
-<h1>{{ $user->name }}</h1>
-<p><strong>Email :</strong> {{ $user->email }}</p>
-<p><strong>Admin :</strong> {{ $user->admin ? 'Oui' : 'Non' }}</p>
-<a class="btn btn-warning rounded-3" href="{{ route('admin.users.edit',$user) }}">Modifier</a>
-@endsection
-
-
-# resources/views/admin/users/edit.blade.php
-
-@extends('layouts.app')
-@section('content')
-<h1>Modifier l’utilisateur</h1>
-<form method="POST" action="{{ route('admin.users.update',$user) }}">@csrf @method('PUT')
-  <div class="mb-3"><label class="form-label">Nom</label><input class="form-control rounded-3" name="name" value="{{ old('name',$user->name) }}"></div>
-  <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control rounded-3" name="email" value="{{ old('email',$user->email) }}"></div>
-  <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="admin" id="isAdmin" {{ $user->admin?'checked':'' }}>
-    <label class="form-check-label" for="isAdmin">Administrateur</label></div>
-  <button class="btn btn-warning rounded-3">Enregistrer</button>
-</form>
-@endsection
-
-
-# resources/views/admin/users/index.blade.php
-
-@extends('layouts.app')
-@section('content')
-<h1 class="mb-4">Gestion des utilisateurs</h1>
-<table class="table table-hover rounded-3 overflow-hidden">
- <thead class="table-warning"><tr><th>Nom</th><th>Email</th><th>Admin</th><th></th></tr></thead><tbody>
- @foreach($users as $u)
-  <tr>
-    <td><a href="{{ route('admin.users.show',$u) }}">{{ $u->name }}</a></td>
-    <td>{{ $u->email }}</td>
-    <td>{!! $u->admin ? '✅' : '—' !!}</td>
-    <td class="text-end">
-      <a class="btn btn-sm btn-outline-dark rounded-3" href="{{ route('admin.users.edit',$u) }}">✏</a>
-      <form class="d-inline" method="POST" action="{{ route('admin.users.destroy',$u) }}" onsubmit="return confirm('Supprimer ?')">
-        @csrf @method('DELETE')<button class="btn btn-sm btn-danger rounded-3">🗑</button>
-      </form>
-    </td>
-  </tr>
- @endforeach
- </tbody>
-</table>
-@endsection
-
-
-# resources/views/plants/show.blade.php
-
-@extends('layouts.app')
-@section('content')
-    <div class="card shadow-lg rounded-3">
-        <div class="card-body">
-            <h1 class="card-title">{{ $plant->name }}</h1>
-            <p><strong>Prix :</strong> {{ $plant->price }} €</p>
-            <p><strong>Description :</strong> {{ $plant->description }}</p>
-            @auth
-                @if (Auth::user()->admin)
-                    <p><strong>Stock :</strong> {{ $plant->stock }} unités</p>
-                @endif
-            @endauth
-
-            <div class="d-flex gap-2 flex-wrap mb-3">
-                <button class="btn btn-success rounded-3"
-                    onclick="window.Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }})">Ajouter
-                    au
-                    panier</button>
-                @auth
-                    @if (Auth::user()->admin)
-                        <a class="btn btn-warning rounded-3" href="{{ route('admin.plants.edit', $plant) }}">Modifier</a>
-                        <form method="POST" action="{{ route('admin.plants.destroy', $plant) }}"
-                            onsubmit="return confirm('Supprimer ?')">
-                            @csrf @method('DELETE')
-                            <button class="btn btn-danger rounded-3">Supprimer</button>
-                        </form>
-                    @endif
-                @endauth
-            </div>
-
-            <a class="btn btn-secondary rounded-3" href="{{ route('plants.index') }}">Retour</a>
-        </div>
-    </div>
-@endsection
-
-
-# resources/views/plants/index.blade.php
-
-@extends('layouts.app')
-@section('content')
-    <h1 class="text-center mb-4">🌿 Liste des plantes</h1>
-    @auth @if (Auth::user()->admin)
-        <a class="btn btn-warning mb-3 rounded-3" href="{{ route('admin.plants.create') }}">Nouvelle plante</a>
-    @endif @endauth
-    <div class="row">
-        @foreach ($plants as $plant)
-            <div class="col-md-4">
-                <div class="card mb-4 shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title"><a class="text-decoration-none text-dark"
-                                href="{{ route('plants.show', $plant) }}">{{ $plant->name }}</a></h5>
-                        <p class="card-text">
-                            <strong>Prix :</strong> {{ $plant->price }} €
-                            @auth
-                                @if (Auth::user()->admin)
-                                    <br><strong>Stock :</strong> {{ $plant->stock }}
-                                @endif
-                            @endauth
-                        </p>
-                        <button class="btn btn-success w-100 rounded-3"
-                            onclick="window.Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }}, {{ $plant->stock }})">
-                            Ajouter au panier</button>
-                    </div>
-                </div>
-            </div>
-        @endforeach
-    </div>
-@endsection
-
-
-# resources/views/carts/index.blade.php
-
-@extends('layouts.app')
-
-@section('content')
-  <h1 class="mb-4">🛒 Mon Panier</h1>
-	@if(session('alert'))
-  <div class="alert alert-danger">{{ session('alert') }}</div>
-	@endif
-	@if(session('stock_adjust'))
-    <div class="alert alert-warning mt-2" role="alert"
-         data-stock-adjust='@json(session('stock_adjust'))'>
-        Stock ajusté automatiquement sur un ou plusieurs articles.
-    </div>
-	@endif
-  <div id="cart-container">
-    <p class="alert alert-info">Chargement du panier...</p>
-  </div>
-@endsection
-
-
-# resources/views/orders/create.blade.php
-
-{{-- alias de new.blade.php pour RESTful resource --}}
-@extends('orders.new')
-
-
-# resources/views/orders/new.blade.php
-
-@extends('layouts.app')
-
-@section('content')
-    @if (!session()->has('success') && !session()->has('error'))
-        <h1 class="text-center mb-4">Valider ma commande</h1>
-        <div id="order-review-container">
-            <p class="alert alert-info">Chargement…</p>
-        </div>
-        <form id="order-form" method="POST" action="{{ route('orders.store') }}" class="mt-3">
-            @csrf
-            <input type="hidden" name="items" id="order-items-input">
-            <button class="btn btn-success w-100 rounded-3">Confirmer la commande</button>
-        </form>
-    @else
-        @if (session('success'))
-            <div id="order-success" data-clear-cart></div>
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    window.location.href = "{{ route('orders.index') }}";
-                });
-            </script>
-        @elseif (session('error'))
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    window.location.href = "{{ route('carts.index') }}";
-                });
-            </script>
-        @endif
-    @endif
-@endsection
-
-
-# resources/views/orders/index.blade.php
-
-@extends('layouts.app')
-@section('content')
-<h1 class="text-center mb-4">📜 Mes commandes</h1>
-@if($orders->isEmpty())
-  <p class="alert alert-info">Aucune commande.</p>
-@else
-	@foreach($orders as $idx => $order)
-	  <div class="card mb-3 shadow-sm rounded-3"><div class="card-body">
-  	  <h5 class="card-title">Commande n°{{ $orders->count() - $idx }}</h5>
-      <p class="text-muted mb-1">Passée le {{ $order->created_at->format('d/m/Y H:i') }} — Total : {{ $order->total_price }} €</p>
-      <ul class="mb-2">
-        @foreach($order->items as $it)
-          <li>{{ $it->plant->name }} × {{ $it->quantity }} – {{ $it->plant->price }} €</li>
-        @endforeach
-      </ul>
-      <p><strong>Statut :</strong> {{ $order->status }}</p>
-    </div></div>
-  @endforeach
-@endif
-@endsection
-
-
-# resources/views/layouts/guest.blade.php
-
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-
-    <title>{{ config('app.name', 'Laravel') }}</title>
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-
-    <!-- Scripts -->
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Alpine.js -->
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-</head>
-
-<body class="font-sans text-gray-900 antialiased">
-    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
-        <div>
-            <a href="/">
-                <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
-            </a>
-        </div>
-
-        <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
-            {{ $slot }}
-        </div>
-    </div>
-</body>
-
-</html>
-
-
-# resources/views/layouts/_navbar.blade.php
-
-<nav class="navbar navbar-expand-lg navbar-dark rounded-3 navbar-custom px-3">
-	<a class="navbar-brand fw-bold text-white" href="{{ route('home') }}">🌿 PlantShop</a>
-	<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navBar"><span class="navbar-toggler-icon"></span></button>
-	<div class="collapse navbar-collapse" id="navBar">
-		<ul class="navbar-nav ms-auto">
-			@auth
-			<li class="nav-item d-flex align-items-center text-white px-2 text-capitalize">
-				{{ Auth::user()->name }}@if(Auth::user()->admin) (Administrateur)@endif
-			</li>
-			@endauth
-			<li class="nav-item"><a class="nav-link" id="cart-link" href="{{ route('carts.index') }}">Mon Panier</a></li>
-			@auth
-			<li class="nav-item"><a class="nav-link" href="{{ route('orders.index') }}">Mes commandes</a></li>
-			<li class="nav-item"><a class="nav-link" href="{{ route('users.show', Auth::id()) }}">Profil</a></li>
-			@if(Auth::user()->admin)
-			<li class="nav-item dropdown">
-				<a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#">Admin</a>
-				<ul class="dropdown-menu">
-					<li><a class="dropdown-item" href="{{ route('admin.plants.index') }}">Plantes</a></li>
-					<li><a class="dropdown-item" href="{{ route('admin.users.index') }}">Utilisateurs</a></li>
-				</ul>
-			</li>
-			@endif
-			<li class="nav-item ms-2">
-				<form method="POST" action="{{ route('logout') }}" class="d-inline">
-					@csrf
-					<button type="submit" class="nav-link btn btn-link px-0 align-baseline" style="text-decoration: none;">
-						Déconnexion
-					</button>
-				</form>
-			</li>
-			@else
-			<li class="nav-item"><a class="nav-link" href="{{ route('register') }}">S’inscrire</a></li>
-			<li class="nav-item"><a class="nav-link" href="{{ route('login') }}">Se connecter</a></li>
-			@endauth
-		</ul>
-	</div>
-</nav>
-
-
-# resources/views/layouts/app.blade.php
-
-<!DOCTYPE html>
-<html lang="fr">
-
-<head>
-    <meta charset="utf-8">
-    <title>Plant Shop</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Styles personnalisés -->
-    <link href="{{ asset('css/orange.css') }}" rel="stylesheet">
-</head>
-
-<body class="bg-light">
-    @include('layouts._navbar')
-    <main class="container my-4">
-        @include('layouts._flash')
-        @yield('content')
-    </main>
-    <!-- Alpine.js -->
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-    <!-- Axios -->
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <!-- Scripts personnalisés -->
-    <script src="{{ asset('js/cart.js') }}" defer></script>
-</body>
-
-</html>
-
-
-# resources/views/layouts/navigation.blade.php
-
-<nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
-    <!-- Primary Navigation Menu -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-            <div class="flex">
-                <!-- Logo -->
-                <div class="shrink-0 flex items-center">
-                    <a href="{{ route('dashboard') }}">
-                        <x-application-logo class="block h-9 w-auto fill-current text-gray-800" />
-                    </a>
-                </div>
-
-                <!-- Navigation Links -->
-                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
-                    </x-nav-link>
-                </div>
-            </div>
-
-            <!-- Settings Dropdown -->
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
-                <x-dropdown align="right" width="48">
-                    <x-slot name="trigger">
-                        <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
-                            <div>{{ Auth::user()->name }}</div>
-
-                            <div class="ms-1">
-                                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                        </button>
-                    </x-slot>
-
-                    <x-slot name="content">
-                        <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Profile') }}
-                        </x-dropdown-link>
-
-                        <!-- Authentication -->
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-
-                            <x-dropdown-link :href="route('logout')"
-                                    onclick="event.preventDefault();
-                                                this.closest('form').submit();">
-                                {{ __('Log Out') }}
-                            </x-dropdown-link>
-                        </form>
-                    </x-slot>
-                </x-dropdown>
-            </div>
-
-            <!-- Hamburger -->
-            <div class="-me-2 flex items-center sm:hidden">
-                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
-                    <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                        <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Responsive Navigation Menu -->
-    <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
-        <div class="pt-2 pb-3 space-y-1">
-            <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Dashboard') }}
-            </x-responsive-nav-link>
-        </div>
-
-        <!-- Responsive Settings Options -->
-        <div class="pt-4 pb-1 border-t border-gray-200">
-            <div class="px-4">
-                <div class="font-medium text-base text-gray-800">{{ Auth::user()->name }}</div>
-                <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
-            </div>
-
-            <div class="mt-3 space-y-1">
-                <x-responsive-nav-link :href="route('profile.edit')">
-                    {{ __('Profile') }}
-                </x-responsive-nav-link>
-
-                <!-- Authentication -->
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-
-                    <x-responsive-nav-link :href="route('logout')"
-                            onclick="event.preventDefault();
-                                        this.closest('form').submit();">
-                        {{ __('Log Out') }}
-                    </x-responsive-nav-link>
-                </form>
-            </div>
-        </div>
-    </div>
-</nav>
-
-
-# resources/views/layouts/_flash.blade.php
-
-@if(session('notice')) <div class="alert alert-success rounded-3">{{ session('notice') }}</div>@endif
-@if(session('alert'))  <div class="alert alert-danger  rounded-3">{{ session('alert')  }}</div>@endif
-@if(session('success')) <div class="alert alert-success rounded-3">Commande confirmée.</div>@endif
-@if(session('error')) <div class="alert alert-danger rounded-3">{{ session('error') }}</div>@endif
-
-
-# resources/views/dashboard.blade.php
-
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Dashboard') }}
-        </h2>
-    </x-slot>
-
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
-                    {{ __("You're logged in!") }}
-                </div>
-            </div>
-        </div>
-    </div>
-</x-app-layout>
-
-
-# resources/views/profile/edit.blade.php
-
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Profile') }}
-        </h2>
-    </x-slot>
-
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-profile-information-form')
-                </div>
-            </div>
-
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-password-form')
-                </div>
-            </div>
-
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.delete-user-form')
-                </div>
-            </div>
-        </div>
-    </div>
-</x-app-layout>
-
-
-# resources/views/profile/partials/update-profile-information-form.blade.php
-
-<section>
-    <header>
-        <h2 class="text-lg font-medium text-gray-900">
-            {{ __('Profile Information') }}
-        </h2>
-
-        <p class="mt-1 text-sm text-gray-600">
-            {{ __("Update your account's profile information and email address.") }}
-        </p>
-    </header>
-
-    <form id="send-verification" method="post" action="{{ route('verification.send') }}">
-        @csrf
-    </form>
-
-    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6">
-        @csrf
-        @method('patch')
-
-        <div>
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
-            <x-input-error class="mt-2" :messages="$errors->get('name')" />
-        </div>
-
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email', $user->email)" required autocomplete="username" />
-            <x-input-error class="mt-2" :messages="$errors->get('email')" />
-
-            @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
-                <div>
-                    <p class="text-sm mt-2 text-gray-800">
-                        {{ __('Your email address is unverified.') }}
-
-                        <button form="send-verification" class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            {{ __('Click here to re-send the verification email.') }}
-                        </button>
-                    </p>
-
-                    @if (session('status') === 'verification-link-sent')
-                        <p class="mt-2 font-medium text-sm text-green-600">
-                            {{ __('A new verification link has been sent to your email address.') }}
-                        </p>
-                    @endif
-                </div>
-            @endif
-        </div>
-
-        <div class="flex items-center gap-4">
-            <x-primary-button>{{ __('Save') }}</x-primary-button>
-
-            @if (session('status') === 'profile-updated')
-                <p
-                    x-data="{ show: true }"
-                    x-show="show"
-                    x-transition
-                    x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-gray-600"
-                >{{ __('Saved.') }}</p>
-            @endif
-        </div>
-    </form>
-</section>
-
-
-# resources/views/profile/partials/update-password-form.blade.php
-
-<section>
-    <header>
-        <h2 class="text-lg font-medium text-gray-900">
-            {{ __('Update Password') }}
-        </h2>
-
-        <p class="mt-1 text-sm text-gray-600">
-            {{ __('Ensure your account is using a long, random password to stay secure.') }}
-        </p>
-    </header>
-
-    <form method="post" action="{{ route('password.update') }}" class="mt-6 space-y-6">
-        @csrf
-        @method('put')
-
-        <div>
-            <x-input-label for="update_password_current_password" :value="__('Current Password')" />
-            <x-text-input id="update_password_current_password" name="current_password" type="password" class="mt-1 block w-full" autocomplete="current-password" />
-            <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2" />
-        </div>
-
-        <div>
-            <x-input-label for="update_password_password" :value="__('New Password')" />
-            <x-text-input id="update_password_password" name="password" type="password" class="mt-1 block w-full" autocomplete="new-password" />
-            <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
-        </div>
-
-        <div>
-            <x-input-label for="update_password_password_confirmation" :value="__('Confirm Password')" />
-            <x-text-input id="update_password_password_confirmation" name="password_confirmation" type="password" class="mt-1 block w-full" autocomplete="new-password" />
-            <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center gap-4">
-            <x-primary-button>{{ __('Save') }}</x-primary-button>
-
-            @if (session('status') === 'password-updated')
-                <p
-                    x-data="{ show: true }"
-                    x-show="show"
-                    x-transition
-                    x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-gray-600"
-                >{{ __('Saved.') }}</p>
-            @endif
-        </div>
-    </form>
-</section>
-
-
-# resources/views/profile/partials/delete-user-form.blade.php
-
-<section class="space-y-6">
-    <header>
-        <h2 class="text-lg font-medium text-gray-900">
-            {{ __('Delete Account') }}
-        </h2>
-
-        <p class="mt-1 text-sm text-gray-600">
-            {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.') }}
-        </p>
-    </header>
-
-    <x-danger-button
-        x-data=""
-        x-on:click.prevent="$dispatch('open-modal', 'confirm-user-deletion')"
-    >{{ __('Delete Account') }}</x-danger-button>
-
-    <x-modal name="confirm-user-deletion" :show="$errors->userDeletion->isNotEmpty()" focusable>
-        <form method="post" action="{{ route('profile.destroy') }}" class="p-6">
-            @csrf
-            @method('delete')
-
-            <h2 class="text-lg font-medium text-gray-900">
-                {{ __('Are you sure you want to delete your account?') }}
-            </h2>
-
-            <p class="mt-1 text-sm text-gray-600">
-                {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.') }}
-            </p>
-
-            <div class="mt-6">
-                <x-input-label for="password" value="{{ __('Password') }}" class="sr-only" />
-
-                <x-text-input
-                    id="password"
-                    name="password"
-                    type="password"
-                    class="mt-1 block w-3/4"
-                    placeholder="{{ __('Password') }}"
-                />
-
-                <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-2" />
-            </div>
-
-            <div class="mt-6 flex justify-end">
-                <x-secondary-button x-on:click="$dispatch('close')">
-                    {{ __('Cancel') }}
-                </x-secondary-button>
-
-                <x-danger-button class="ms-3">
-                    {{ __('Delete Account') }}
-                </x-danger-button>
-            </div>
-        </form>
-    </x-modal>
-</section>
-
-
-# resources/views/auth/confirm-password.blade.php
-
-<x-guest-layout>
-    <div class="mb-4 text-sm text-gray-600">
-        {{ __('This is a secure area of the application. Please confirm your password before continuing.') }}
-    </div>
-
-    <form method="POST" action="{{ route('password.confirm') }}">
-        @csrf
-
-        <!-- Password -->
-        <div>
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <div class="flex justify-end mt-4">
-            <x-primary-button>
-                {{ __('Confirm') }}
-            </x-primary-button>
-        </div>
-    </form>
-</x-guest-layout>
-
-
-# resources/views/auth/reset-password.blade.php
-
-<x-guest-layout>
-    <form method="POST" action="{{ route('password.store') }}">
-        @csrf
-
-        <!-- Password Reset Token -->
-        <input type="hidden" name="token" value="{{ $request->route('token') }}">
-
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email', $request->email)" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
-
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-            <x-text-input id="password" class="block mt-1 w-full" type="password" name="password" required autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <!-- Confirm Password -->
-        <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
-
-            <x-text-input id="password_confirmation" class="block mt-1 w-full"
-                                type="password"
-                                name="password_confirmation" required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button>
-                {{ __('Reset Password') }}
-            </x-primary-button>
-        </div>
-    </form>
-</x-guest-layout>
-
-
-# resources/views/auth/register.blade.php
-
-<x-guest-layout>
-    <form method="POST" action="{{ route('register') }}">
-        @csrf
-
-        <!-- Name -->
-        <div>
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus autocomplete="name" />
-            <x-input-error :messages="$errors->get('name')" class="mt-2" />
-        </div>
-
-        <!-- Email Address -->
-        <div class="mt-4">
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
-
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <!-- Confirm Password -->
-        <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
-
-            <x-text-input id="password_confirmation" class="block mt-1 w-full"
-                            type="password"
-                            name="password_confirmation" required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
-            <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('login') }}">
-                {{ __('Already registered?') }}
-            </a>
-
-            <x-primary-button class="ms-4">
-                {{ __('Register') }}
-            </x-primary-button>
-        </div>
-    </form>
-</x-guest-layout>
-
-
-# resources/views/auth/custom-login.blade.php
-
-@extends('layouts.app')
-
-@section('content')
-<h1>Connexion</h1>
-<form method="POST" action="{{ route('login') }}" class="w-100" style="max-width: 500px">
-    @csrf
-    <div class="mb-3">
-        <label class="form-label">Email</label>
-        <input name="email" type="email" class="form-control" value="{{ old('email') }}" required autofocus>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Mot de passe</label>
-        <input name="password" type="password" class="form-control" required>
-    </div>
-    <div class="mb-3 form-check">
-        <input name="remember" type="checkbox" class="form-check-input" id="remember">
-        <label class="form-check-label" for="remember">Se souvenir de moi</label>
-    </div>
-    <button type="submit" class="btn btn-primary">Se connecter</button>
-</form>
-@endsection
-
-
-# resources/views/auth/verify-email.blade.php
-
-<x-guest-layout>
-    <div class="mb-4 text-sm text-gray-600">
-        {{ __('Thanks for signing up! Before getting started, could you verify your email address by clicking on the link we just emailed to you? If you didn\'t receive the email, we will gladly send you another.') }}
-    </div>
-
-    @if (session('status') == 'verification-link-sent')
-        <div class="mb-4 font-medium text-sm text-green-600">
-            {{ __('A new verification link has been sent to the email address you provided during registration.') }}
-        </div>
-    @endif
-
-    <div class="mt-4 flex items-center justify-between">
-        <form method="POST" action="{{ route('verification.send') }}">
-            @csrf
-
-            <div>
-                <x-primary-button>
-                    {{ __('Resend Verification Email') }}
-                </x-primary-button>
-            </div>
-        </form>
-
-        <form method="POST" action="{{ route('logout') }}">
-            @csrf
-
-            <button type="submit" class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                {{ __('Log Out') }}
-            </button>
-        </form>
-    </div>
-</x-guest-layout>
-
-
-# resources/views/auth/custom-register.blade.php
-
-@extends('layouts.app')
-
-@section('content')
-<h1>Inscription</h1>
-<form method="POST" action="{{ route('register') }}" class="w-100" style="max-width: 500px">
-    @csrf
-
-    <div class="mb-3">
-        <label class="form-label">Nom</label>
-        <input name="name" type="text" class="form-control" value="{{ old('name') }}" required autofocus>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Email</label>
-        <input name="email" type="email" class="form-control" value="{{ old('email') }}" required>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Mot de passe</label>
-        <input name="password" type="password" class="form-control" required>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Confirmation</label>
-        <input name="password_confirmation" type="password" class="form-control" required>
-    </div>
-
-    <button type="submit" class="btn btn-success">S’inscrire</button>
-</form>
-@endsection
-
-
-# resources/views/auth/login.blade.php
-
-<x-guest-layout>
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
-
-    <form method="POST" action="{{ route('login') }}">
-        @csrf
-
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
-
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <!-- Remember Me -->
-        <div class="block mt-4">
-            <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                <span class="ms-2 text-sm text-gray-600">{{ __('Remember me') }}</span>
-            </label>
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
-            @if (Route::has('password.request'))
-                <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('password.request') }}">
-                    {{ __('Forgot your password?') }}
-                </a>
-            @endif
-
-            <x-primary-button class="ms-3">
-                {{ __('Log in') }}
-            </x-primary-button>
-        </div>
-    </form>
-</x-guest-layout>
-
-
-# resources/views/auth/forgot-password.blade.php
-
-<x-guest-layout>
-    <div class="mb-4 text-sm text-gray-600">
-        {{ __('Forgot your password? No problem. Just let us know your email address and we will email you a password reset link that will allow you to choose a new one.') }}
-    </div>
-
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
-
-    <form method="POST" action="{{ route('password.email') }}">
-        @csrf
-
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button>
-                {{ __('Email Password Reset Link') }}
-            </x-primary-button>
-        </div>
-    </form>
-</x-guest-layout>
-
-
-# resources/views/users/show.blade.php
-
-@extends('layouts.app')
-@section('content')
-<h1>Mon profil</h1>
-<p><strong>Nom :</strong> {{ $user->name }}</p>
-<p><strong>Email :</strong> {{ $user->email }}</p>
-<a class="btn btn-warning rounded-3" href="{{ route('users.edit',$user) }}">Modifier</a>
-@endsection
-
-
-# resources/views/users/edit.blade.php
-
-@extends('layouts.app')
-@section('content')
-<h1>Modifier mon profil</h1>
-<form method="POST" action="{{ route('users.update',$user) }}">@csrf @method('PUT')
-  <div class="mb-3"><label class="form-label">Nom</label><input class="form-control rounded-3" name="name" value="{{ old('name',$user->name) }}"></div>
-  <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control rounded-3" name="email" value="{{ old('email',$user->email) }}"></div>
-  <button class="btn btn-warning rounded-3">Enregistrer</button>
-</form>
-@endsection
-
+==== FICHIERS UTILES DU PROJET SYMFONY (avec contenu) ====
 
 # public/js/cart.js
 
@@ -2873,6 +474,650 @@ document.addEventListener("DOMContentLoaded", () => {
 │   │       └── remotes/
 │   │           └── origin/
 │   │               └── master
+│   ├── objects/
+│   │   ├── 00/
+│   │   │   ├── 1c856762532b2baa99130936fd9f553e3252e3
+│   │   │   ├── 345321ce0f95056a8f34535093be31bd023ada
+│   │   │   └── 8fe87c9a190a0ad5a2fabeb0fa564a6fffd20d
+│   │   ├── 01/
+│   │   │   ├── 619523750d907f6faab3b7c1d011ea5e08593b
+│   │   │   └── e4a6cda9eb380973b23a40d562bca8a3a198b4
+│   │   ├── 02/
+│   │   │   ├── 1f94110d3b97700638301eb57c812dcf0afd56
+│   │   │   └── 451de7b59ef02298460f5adff6310286f4ead0
+│   │   ├── 03/
+│   │   │   ├── 69b02c954a711498f468fb1be5e5c5d508cac9
+│   │   │   └── ad9bd4203487cae673e32548149bf8e38d4a56
+│   │   ├── 05/
+│   │   │   ├── 128937db1bde42c0558542bb21ffa7d2b18cac
+│   │   │   ├── 160819615239b8c1fd1bd78b939a4a4daf93a4
+│   │   │   └── 66e613d1c26dc00a575cf3de7f8b5c6bd63d6c
+│   │   ├── 06/
+│   │   │   └── 7626e9236e313c7b7043bd9b18a193fd20cfb7
+│   │   ├── 07/
+│   │   │   ├── 07f07d1690c085ff0d85e345fd67a50073cccd
+│   │   │   └── 39e2e87680d6fa82b0f4a46791d3bf2aa278fd
+│   │   ├── 08/
+│   │   │   └── e7f920a87294695db71e0228c272d8e5d6ff6b
+│   │   ├── 09/
+│   │   │   └── 599007e4780acf8104dc0a01eea21294385cb1
+│   │   ├── 0b/
+│   │   │   ├── a5d5d8f10c959d538e1e6ae87aa271d41e1ff0
+│   │   │   ├── beb9a94147bb1f7b99feb9425eecb248f0484b
+│   │   │   └── eb16827e36458c392702367e895601be5837c9
+│   │   ├── 0d/
+│   │   │   ├── da408f1fca65dd29f9bb643bf08e67a4afe59d
+│   │   │   └── f851c4682d409ecacdc479cf4d2e685bec3cfc
+│   │   ├── 0e/
+│   │   │   └── edb6371937f18f78e73b4528ed27a540ecb5cd
+│   │   ├── 0f/
+│   │   │   └── fa9d191beebafd0cb14b5cefdd5fb429357f6f
+│   │   ├── 10/
+│   │   │   ├── 06a2cba81b7e648ddd918e689068ea15939fd5
+│   │   │   ├── 3c9ea2922eae8b900fc2f951dd8e672351aa4f
+│   │   │   ├── b07c26a567dc25e54703aabaf54d5d457ad2fe
+│   │   │   ├── d1343cd190051e4db62fa700b0eb616e0871af
+│   │   │   └── fbc66dd29faf19f4302723b23a906a9526c3ca
+│   │   ├── 11/
+│   │   │   ├── 6bd8d002477e76510418cdbe2ac90a92ea7ce7
+│   │   │   ├── 93f07e17619954d71153bbaa34d803cb787cdb
+│   │   │   ├── c01a6e7e2d16d49c76b55e1a6e163e987ef175
+│   │   │   ├── da8938f652c437994f58e86a575966d9ddbaa1
+│   │   │   └── feb470a101c9b83405bd14dbec124166120afe
+│   │   ├── 12/
+│   │   │   └── 5ec5b65c04ca0533af868e31cc05df665fe7d6
+│   │   ├── 13/
+│   │   │   ├── 45f6f66c51db027bbe415c8e1004a0cd310331
+│   │   │   └── dcb7ce7eb6c9d3a75bc95ddfdcd024337f1418
+│   │   ├── 14/
+│   │   │   ├── 6388a13ab73139176503f5e768f1e7c419e1ce
+│   │   │   └── 89d0e0f1d7b358509b0226a279d62081c11410
+│   │   ├── 16/
+│   │   │   ├── aa3b01f01b64248c3fb4bf2a560e0b4dfd0a62
+│   │   │   └── d80c27f5ecdd33b87bebd284101a4dea8f7cf3
+│   │   ├── 17/
+│   │   │   └── 0af1393328c609792c72c568137aed0b59b32a
+│   │   ├── 18/
+│   │   │   └── 171e6380276a83fbbc9a1a05e3a443d19d460d
+│   │   ├── 19/
+│   │   │   └── ec796756cbb955b1b2338f482116ad06b585dd
+│   │   ├── 1b/
+│   │   │   └── 26cdeb610c5c70c79cbffad58e24408e6465e4
+│   │   ├── 1c/
+│   │   │   ├── c65e21d6d4b4bd08ad65a82edbfbdf76094955
+│   │   │   ├── daf6ea78d25ca2cba905b5ecc7fa3da057ab00
+│   │   │   └── f491776b20c6dd5931699b3b2a25497ec6d883
+│   │   ├── 1d/
+│   │   │   └── 4504b2b93465d43ad119f81ed46a6eb7a13947
+│   │   ├── 1e/
+│   │   │   └── 3bf56c3e56841fe9a77a4a90640f0635bf0e5a
+│   │   ├── 1f/
+│   │   │   ├── 49756e9a881c429fa48d35654197cf931c18db
+│   │   │   ├── 529046073a972a051df21a587f0552ff9cea86
+│   │   │   ├── c8978d8405055640d23562be9a9d74dea0fc77
+│   │   │   └── cbcee776a2b13dd18224b8648c13f9824e0977
+│   │   ├── 21/
+│   │   │   └── 26c9ce80a245a615961d5e875f4ee7c3152c3d
+│   │   ├── 22/
+│   │   │   └── b748c8e103f05b15195e149b216fd974cefc15
+│   │   ├── 23/
+│   │   │   ├── 620bbe484221b347a0fbd246e8898db748bd31
+│   │   │   └── ce85b0cb35023ff984736d0e4c4459fff83fc7
+│   │   ├── 24/
+│   │   │   ├── 52e4cba4aebfc98580908b0ff4b3da587a866f
+│   │   │   └── 944d92ced5bd47f417738ffc4df976503b015e
+│   │   ├── 25/
+│   │   │   ├── 0ae77f67f1905fa3da327555b15aa19b723017
+│   │   │   ├── 2fdcc525a1d0a0c52fe12ffca7d89fc87292ea
+│   │   │   ├── 7212c13e8dfe49960b9bd3fa6fa9f4551c625f
+│   │   │   └── 746424580a1206e6995f034ecbf8b9cc7cd607
+│   │   ├── 27/
+│   │   │   ├── 956975d49e3c9c3ff0d1fa448ad4e0811a54c3
+│   │   │   └── a36175f8236be239854f401d88ae0f52e4b0cf
+│   │   ├── 28/
+│   │   │   └── 47737bf8036e04b157f60da35193157979882a
+│   │   ├── 29/
+│   │   │   ├── 140435a71a3cdf8510b57ad1fb823d6c7b011d
+│   │   │   ├── 526ec944adb5f8831a97ef44bc05b3460f1223
+│   │   │   ├── 75f99d6434e9b4353c78f38f3255aa739e1386
+│   │   │   └── b1d3ac0df35b6f4f0c8cb94fd90dc34bf63b99
+│   │   ├── 2b/
+│   │   │   └── 28db898918e161a61086d4747423025fa8915a
+│   │   ├── 2c/
+│   │   │   ├── e7d18a3bde7ac42635a1ae824ca9dd357cc077
+│   │   │   └── fa0f126d3effcbcf1c1f499bb46926672d1f24
+│   │   ├── 2d/
+│   │   │   └── 485c0ec25af67cc4e68e688def9bb26d6cbd32
+│   │   ├── 2f/
+│   │   │   ├── 50f9f49e2b83c5c9ad133b3aa69fcbb0e18170
+│   │   │   └── e2ea0cc0d981d531d3771bdce1a0fda5125c26
+│   │   ├── 30/
+│   │   │   └── bc237bb0946cdccca1caeb72ec128dfde7d8d0
+│   │   ├── 32/
+│   │   │   ├── 4b513a2733ba90cd9d0ab8990f4a6de633f58e
+│   │   │   └── e46a3cd15b9aa54cccc46fc53990f382062325
+│   │   ├── 33/
+│   │   │   └── f57519ce849a343c792f6a87d89de65e1e67aa
+│   │   ├── 34/
+│   │   │   └── 25657d5df80e7d9ea30a190d0e8c7621b771b7
+│   │   ├── 35/
+│   │   │   └── db1ddf0e04fb9f138a372b17d0bfc8480bef38
+│   │   ├── 36/
+│   │   │   ├── 22a8f37c2accfa385618240df70ac74fea342a
+│   │   │   ├── 3388773157a2ff94165fc67bf3d04b0df8cf65
+│   │   │   └── 9c0fa33717d15d298896da541d31997b8036a0
+│   │   ├── 38/
+│   │   │   └── b258d1855b5e767bde3df168106f468088472f
+│   │   ├── 39/
+│   │   │   ├── 15f94109143fb74c36e8474ee3a90476d800f5
+│   │   │   ├── 26ecf72a8b0ceb1d796215be602d6b6accf846
+│   │   │   ├── 3fad256e68387f2db0ac4efedc74e7af26990a
+│   │   │   └── c6419b1e5308e99394cae95aec972e32601bc2
+│   │   ├── 3a/
+│   │   │   └── 6ceb3113f4b23235ea6213cea5f54bc6eda10f
+│   │   ├── 3c/
+│   │   │   ├── 8fa44ec87349c957fb4a4efa3021e6ef33c9a8
+│   │   │   ├── 9adf1af8430da566d123514630bcc30c9c1345
+│   │   │   ├── 9bfed2e7a4b32e68a00935bb5a8fa98db6ae81
+│   │   │   └── c89e5a0f7e8f6939cc3a17596c667716042b61
+│   │   ├── 3d/
+│   │   │   ├── 0cb7e6f1b1a7923a6672aa1876cccddf41681d
+│   │   │   ├── 381860098a5895b5978fcca93ba6a358c9cfd7
+│   │   │   └── 671bd9105e0cd917fdc14d857fdac26f54d151
+│   │   ├── 3e/
+│   │   │   ├── 33231572f068578ff8df860dd9fedfd7f4090b
+│   │   │   └── 5a7b5bac9b35d9b09637ad69b4616ffde7a107
+│   │   ├── 3f/
+│   │   │   └── da5a19b3505f694727606dba3837c15200ef49
+│   │   ├── 40/
+│   │   │   └── c1120fa4c8d0541022269ffc128f625b93c9e9
+│   │   ├── 41/
+│   │   │   ├── 246fbfad434134bc5bf35452d8e8bc2d0d5f42
+│   │   │   ├── 34a81ef8ee8361eac6341290f1aa708fe1fd14
+│   │   │   └── 662511cf8f837e9016ce115f248ff31d8f604b
+│   │   ├── 42/
+│   │   │   ├── 1b5695627db43c022947cfc7c0ecce6b9689be
+│   │   │   ├── 2a198cae71067ce3b25deb627bf47119275e11
+│   │   │   ├── 6f2046747dde867e52d56c5131f04449d035c6
+│   │   │   └── d99dbc6a0e9516b4e9321286593fc86e22d453
+│   │   ├── 43/
+│   │   │   ├── b91e7bde768fe72c99dbdc0f2e38b805b81c32
+│   │   │   └── b9e541b7b3aeffaf166d330e5a162800bd7a83
+│   │   ├── 44/
+│   │   │   ├── 50be275954641eb736c7178895025cc142429f
+│   │   │   └── 6a8c434f4aa87ee9c0ba7c80c69921ac849464
+│   │   ├── 45/
+│   │   │   └── 2e6b65b7a18aa7c3aaf886fd183a002d381e34
+│   │   ├── 46/
+│   │   │   └── 579cf07dfe96e2adee727bf7a2e04c02f0ff13
+│   │   ├── 47/
+│   │   │   └── 79b9290b79b4d5cc25177194becc550ba1a0cb
+│   │   ├── 49/
+│   │   │   ├── 4107bd99da9c19d35f6b348702dc730822baa2
+│   │   │   ├── 63c6841f5c837f2452b6d684cd4a10933e4417
+│   │   │   ├── c0612d5c24aa905f8b947afbf3367746452476
+│   │   │   └── f87dbe5b3d928447a4cd7a95ae3c7633974e99
+│   │   ├── 4a/
+│   │   │   └── 2da4ffa9e9295139477047af4c2cc69cb23e3c
+│   │   ├── 4b/
+│   │   │   ├── 79e785783f4d0f92ccc5fe319d3d90811bf633
+│   │   │   └── 9032f13491012d7f8bd25bd33a660d77978448
+│   │   ├── 4c/
+│   │   │   ├── 26d803b8fc0f49dea2c58f7897dbd8ededfee9
+│   │   │   ├── 4e74338fecf1b66e1fa81e07a2a00087cfc32d
+│   │   │   └── d24fd6e2adcbe577afd3ca06cea3c658dd090b
+│   │   ├── 4e/
+│   │   │   ├── 514d5e7dfd23adca62d4f727f7897a70b51131
+│   │   │   └── b3e0ae184cb74a2d19729bdbacc5dae385333d
+│   │   ├── 4f/
+│   │   │   └── 9e7e5b5dfb2c65f2cc172236d433a3b10be599
+│   │   ├── 50/
+│   │   │   └── 20669529fb083628848c0cdd39ebd05f10c497
+│   │   ├── 51/
+│   │   │   ├── 8c7a0e1c8cbddeba1545654a158b474af480a5
+│   │   │   └── 8d48f62dd95a7e3cdc88724d856354848e7daf
+│   │   ├── 52/
+│   │   │   └── a095116863368a73c50dec66a28a7d9bed58d3
+│   │   ├── 53/
+│   │   │   └── f29941dd7b15238f6ad5b848c92da65fe646a3
+│   │   ├── 55/
+│   │   │   ├── ba4b9eab02c8056eef2652d24d0a1f7dfd64b8
+│   │   │   └── f793fbd517147350ad93d68243d0a6fde0f79e
+│   │   ├── 57/
+│   │   │   ├── 73b0ceb771e176520d5a9c1efe5e918878318d
+│   │   │   ├── b868fa7241c8cf3fc9a7643971fac210935282
+│   │   │   └── cf71a2bde418989a318bdd97684c3eddc3f93e
+│   │   ├── 58/
+│   │   │   └── 4104c9cf7521e255fad7a01e2cec3658a4d2c4
+│   │   ├── 5a/
+│   │   │   ├── 46f5411c4021f003507cac48d9c6caaf4aa322
+│   │   │   ├── 8310aac14417eb597b710fd88bf0e5a8f3ad28
+│   │   │   ├── 945f85ecf2fc9476447a17b0c117a56f9b82aa
+│   │   │   ├── a6ac9546d455e012b1bfdda9dfc4b74778dff5
+│   │   │   └── e3d35d053b0fa154b4a594ea873dd9b52d04f9
+│   │   ├── 5c/
+│   │   │   ├── 008f67c24d83dca52546ab133d8d6f7f9a6c15
+│   │   │   ├── 101a29e88fd314bb5051f04b09896bb63577b8
+│   │   │   ├── 3962acc1c4770e5f8da3ea92a2350bcd02c87b
+│   │   │   └── 9ab8e21a960eec55d45e4a1680bdab05f6c19d
+│   │   ├── 5d/
+│   │   │   └── be52be35eab03c5c215e7486f5ded20afa1d1c
+│   │   ├── 5f/
+│   │   │   ├── 0d66f29943811820853fc093ee2b9b0323ea81
+│   │   │   └── 1390b015cbf1ee54f580c38fcd47a723eb81f4
+│   │   ├── 60/
+│   │   │   └── 324cfb914b1d709f3046b3971eddf216ca4225
+│   │   ├── 61/
+│   │   │   ├── 3bcd9d935fca7b0e7451060d8dd640f77c2509
+│   │   │   ├── b8819f39baba7bc01f9dcf02acced3d95210b4
+│   │   │   ├── c031c478ef57ccc703432e52fce874d0c2c8de
+│   │   │   └── d6456eb128ee0f6aa60ea3bcdf36551102db94
+│   │   ├── 62/
+│   │   │   └── e47a4e475d7bdb5c5c6a2160200de54e1e14da
+│   │   ├── 63/
+│   │   │   ├── 0a2f3bca1d390c4892deef5d435adf30d887a8
+│   │   │   └── 85961180459674c862ed0e59342dcc85d1a37b
+│   │   ├── 65/
+│   │   │   ├── 609b41601057288739917a17ec4f208d70249c
+│   │   │   ├── 7b331386bb013941af821d60b9e262654b51f3
+│   │   │   ├── 9573401be9b9c5cb0c15e43dfad6057b1e20a4
+│   │   │   └── e03692823d6261aa8da0d529c42d37a976254f
+│   │   ├── 66/
+│   │   │   └── 028f2dc930b177b3a4b07f4402a8a025a8ebd9
+│   │   ├── 67/
+│   │   │   └── a8c6f05bd60cc3b1967ba77d3255ae9ac491c9
+│   │   ├── 68/
+│   │   │   ├── 2ce8f352c57a4747b8610f76d9efedd142f9ea
+│   │   │   ├── 51ea97b198f81475fb0fb4ddf49b66820c94f6
+│   │   │   └── e3909dc5d43d5c4f6ca8fd3332b028c33e5bab
+│   │   ├── 69/
+│   │   │   ├── 164091a61710120417c27d90793a6bb2074e4d
+│   │   │   └── bc823cca531b6559b21bb8d2d51363b161bac6
+│   │   ├── 6a/
+│   │   │   ├── 5f06613faec2c017e7de57b3f64421fd87db84
+│   │   │   └── 814085ffb0ea447518048caa7ce1ba652d9956
+│   │   ├── 6b/
+│   │   │   ├── 000699b02a98116be455ce24d3e54be3668a76
+│   │   │   └── 5394ee7165cdeb4202d79f24ac5dc77582be8b
+│   │   ├── 6c/
+│   │   │   └── c52f51e8befd961a9ad272e4e76284d6bffba4
+│   │   ├── 6d/
+│   │   │   ├── 855069962caf0104b0f146ce185208345aa6da
+│   │   │   └── 9c5c6ee93f0fcc2a1fb437669df5f1969f880d
+│   │   ├── 6e/
+│   │   │   ├── 57731e084adc423a9f698e7113e22bdfd00457
+│   │   │   ├── a3eedbd9e97abaf1ceed8f3e0cb1df4400c86c
+│   │   │   ├── a85b88354ec6607931d536703ba5eb313d40fa
+│   │   │   └── cb2998b56dcfe4fd3b3c3335d9e47fa74c9fdd
+│   │   ├── 70/
+│   │   │   ├── 5570b43f3a048623759a159020d7ee0739cc57
+│   │   │   ├── 704c1ab9d7364ad311b4f2c3dc8dc098cbfb1b
+│   │   │   └── a040ad97af7dabc7942660126efae5a5eabcf0
+│   │   ├── 71/
+│   │   │   ├── 2394a5a377259f398070884d4c15e9bd7a575c
+│   │   │   └── ace3664627062201b710628457628982ab365b
+│   │   ├── 72/
+│   │   │   ├── 103fa6ea0e4919665963418d94d3145de74928
+│   │   │   ├── 5e41a523b955e527eb0d342dfc5baf6f7985b5
+│   │   │   └── 7d1ead59449dc52a578eb218c2aa1187e6247b
+│   │   ├── 73/
+│   │   │   ├── 042746e4d0477849d5676e67f78a8c841e8941
+│   │   │   └── 704786eda4992ea61ce5d66a5a4938671cfd58
+│   │   ├── 74/
+│   │   │   ├── 9c7b77d9befa8c8726db91a4ba38ff777cc8ff
+│   │   │   └── bb7cac8e4ad4e67240e4e526a5a877aa38b09d
+│   │   ├── 75/
+│   │   │   ├── 0a5770cbf714168ec1291e28ef94e5eb58460f
+│   │   │   └── c97e44af55c9c3074e56b05baaf5b7c78b11cd
+│   │   ├── 76/
+│   │   │   └── 41877608bd31c8524a426a3e294c093ccb6435
+│   │   ├── 77/
+│   │   │   ├── 155933c2a6028f086de96c5f9a2bb798fa1c61
+│   │   │   └── 61a306c8115f8ea4ba5513d380455bf4f928d7
+│   │   ├── 78/
+│   │   │   ├── 4765e3a5961b9293b74158d8c270088ef4738a
+│   │   │   ├── 640a647d9540dc24d094e83282d21f03f86e7f
+│   │   │   ├── b684f7d1d6c4a09434933dac3ef3ae652d85f3
+│   │   │   └── c936cec65c56154e75cbac6f8cef991614ab59
+│   │   ├── 79/
+│   │   │   ├── 46d7091219d79b5cb26aff6120574a056bfe17
+│   │   │   └── 786aa71b0d1d7d47cfc0442062b81f8102485e
+│   │   ├── 7b/
+│   │   │   └── 162dac3d93adb46face112c9dff5ed8bae3df5
+│   │   ├── 7c/
+│   │   │   ├── 002c183f5b8de1f0121f5b5a46f563194f6d29
+│   │   │   └── 3f75f83bd3c73623e170bf9bd7601d1a92724d
+│   │   ├── 7d/
+│   │   │   └── c2932b9f7384ad36b530caa952ff4f6ca0d449
+│   │   ├── 7e/
+│   │   │   ├── 1642f3322401cbe07af341a84b7888f4ac7495
+│   │   │   └── 4439d5a2e14ddeaa4e8f03fcd6c3a16750aaeb
+│   │   ├── 82/
+│   │   │   └── 0460ffa864e8af7522e428bb4c4f7107241fed
+│   │   ├── 83/
+│   │   │   ├── 1b218e097ea4bfb1bd575753bf16d29ab9814a
+│   │   │   ├── 501c62fdfecffd7078f92f66f6c8aca749e170
+│   │   │   ├── 64a84e2b7eea9f007e99a5d3333273fe30bf8a
+│   │   │   ├── 66e5e0b7ee2fb41511a0a2153c472819201d8e
+│   │   │   └── dc5e2b3704103dc6cbbc1a0e1cb24791afacb2
+│   │   ├── 84/
+│   │   │   ├── 48eecd1a233d920f54e23c4bea7b137e5e43f0
+│   │   │   └── 546e74f1e65d5b8402082f9c690baf24f33c42
+│   │   ├── 86/
+│   │   │   └── 77cd5cabb06901eac3d8f9a500094d2c1dab45
+│   │   ├── 87/
+│   │   │   ├── 28899746deec8d3cc1081ffc8c92d04b138e16
+│   │   │   ├── a2ce142db5daea53c47716b028570ed776c867
+│   │   │   ├── bc0d57373863b5e7267ee052bc694eada1312e
+│   │   │   └── c4a00c9838d0f471fec2faf707115750ec50c7
+│   │   ├── 89/
+│   │   │   ├── 10562d6143cfdc233835f2e6499b6512764039
+│   │   │   └── 8924122b9d7b753d354f9eea4eba9d1f2d2eb2
+│   │   ├── 8a/
+│   │   │   └── 573a17b1c18d1a50f4258c35778401d10891c2
+│   │   ├── 8b/
+│   │   │   └── b89be003ad277bd7e660795d9b0047ae0bb281
+│   │   ├── 8c/
+│   │   │   ├── 2234028649c94b106570a851f21f1f347ecd41
+│   │   │   └── 78405ddce6c0a4730f332360ddb62822051839
+│   │   ├── 8f/
+│   │   │   ├── 0de65c560259bd171d746d12aa187f666893a3
+│   │   │   └── 2a3d5fced79851b675dc7c2bcb9d54985aa50a
+│   │   ├── 91/
+│   │   │   └── d52686a695f3e1d156e036d73568262e23dce5
+│   │   ├── 92/
+│   │   │   ├── 5f7d2ee84ba4435a6f512534598eb06a20148a
+│   │   │   ├── 7cf1286d84ed1b03c12348530aad90437d9b7c
+│   │   │   └── dda4ca03430b2193026af7924745b04be3de0c
+│   │   ├── 94/
+│   │   │   ├── 280398d6b9734948c1ce0d6376f98210acaced
+│   │   │   ├── 4989fbb7b144960ba6244e37cb8e8b40e8f567
+│   │   │   ├── a77e6f08dac1ee38db322151c5512c12fed5d9
+│   │   │   └── dd21697fdf1a618ec075453e937aa220280439
+│   │   ├── 95/
+│   │   │   ├── 55892c9d3545fce263f3e09178fea309c1a48d
+│   │   │   └── 88e23f1e915a01b9a3fee264cd4a0295f7120b
+│   │   ├── 96/
+│   │   │   ├── 233b34ccba706a9f89dca87a9282a3cd836e0a
+│   │   │   ├── a0079997169985985ea2efde66feaa2c27a634
+│   │   │   └── fb55614a43bc7a3971d35e54af44876d70d59e
+│   │   ├── 97/
+│   │   │   ├── 5cbf3f967693d85d5bb50056e9d59f9d370bb1
+│   │   │   └── e850a1e26027ca7f28fe39bd96c1b2ef903f50
+│   │   ├── 98/
+│   │   │   └── 95190d3c3cdc187248d79b360d34d32c8f62d1
+│   │   ├── 99/
+│   │   │   ├── 7dbb68f0e448709d4c030c8d8f5f59dd56dcef
+│   │   │   └── f0a226ed71e76caa0e59e6e4edece574fef837
+│   │   ├── 9a/
+│   │   │   ├── 2d2e08ecf68e1510a7ccd76b23042ca14f0fa3
+│   │   │   ├── 818fbbd4c5f07fd5b53004779e1a7a58947890
+│   │   │   └── 9bce61a35f08f1786cda399ec163139a7de5fe
+│   │   ├── 9b/
+│   │   │   ├── 19b93c9f13d72749cc3bac760a28325116f3f1
+│   │   │   └── 7ea854513640dc4a2a57712ef0844662572917
+│   │   ├── 9c/
+│   │   │   ├── 1c99aa6b984adb380699c3c4465d9b2a9e9d4b
+│   │   │   ├── 697c9c987004e50afb491fdb5cb85447cc7e86
+│   │   │   └── 766757fee2ad91f18fd646334a76d0039fe603
+│   │   ├── 9d/
+│   │   │   ├── 32e6f0c4718c688e1cddec2b6746a5eba996f8
+│   │   │   └── f0bf8f3d189981c4693ff526716bfdd8b7b892
+│   │   ├── 9e/
+│   │   │   ├── 6da217b7b9f02a0a4e65b443e21ed48e8d40b0
+│   │   │   └── f7ea33ea48fd4e37f0925ae3e82ec15e41ec0e
+│   │   ├── 9f/
+│   │   │   ├── 091997fae026d601ae063c955c51171219b1f7
+│   │   │   └── 5520ce978c24588697cfb8c7b9d2f1a2d753ea
+│   │   ├── a0/
+│   │   │   ├── a2a8a34a6221e4dceb24a759ed14e911f74c57
+│   │   │   └── cec8e35c6c019ee0ecb50467dfe233114cbc4f
+│   │   ├── a1/
+│   │   │   ├── 2485f10b01853f65ea01971b6d4335030655c6
+│   │   │   ├── 5f53a7573b15d1ed69b478c73f3b66619c3f4c
+│   │   │   └── 7165ce118cdb9b5b755817aca90a303ea4f6cf
+│   │   ├── a4/
+│   │   │   ├── 1867f632904cc9f8dfef35ed4d7ae866c01b36
+│   │   │   ├── 1aa2b4bc4f69b38a38c96f820e860aaeb7c5e7
+│   │   │   ├── 6f7c83860462b20a758f026e0460bb0d1a4b11
+│   │   │   └── 8eb8d829dc3b348d094c108fcda9219c5c4ee7
+│   │   ├── a5/
+│   │   │   └── ee2427117d220cc6dfc9aa4f1e360dc5afa640
+│   │   ├── a6/
+│   │   │   ├── 494ccaaed54768a9d2b7cb5ea78503bbe59450
+│   │   │   ├── 6a1910fe88dba7f897b0b53dfdd9d0b1ef0609
+│   │   │   └── 75644c0c422e33ec68b438dfbd04ea1e437996
+│   │   ├── a8/
+│   │   │   ├── 093bee7686ff28db6c6f89afac6e2c4da1518c
+│   │   │   ├── 57242c86e14410e1302e5e2071cb8c2a85b33b
+│   │   │   └── b9b169d64a3a058d3c33cefd76c0b40949bd79
+│   │   ├── aa/
+│   │   │   └── 50350588345237d55315d5e59f8fe4fd93ad6f
+│   │   ├── ab/
+│   │   │   ├── 9427dfcad68bb08f42b4850d718c89ed203d24
+│   │   │   └── 9865872fbacbebabf08d9c632f089afb13ff41
+│   │   ├── ac/
+│   │   │   ├── 0ee44d1248c6effabc4dd83e4b7cbd40539fce
+│   │   │   ├── 2e6cc046dc9ff73f1fe94a6de6504bba586b4c
+│   │   │   ├── baae11046cc32b12f3bea743a5a0ef2b1ae743
+│   │   │   ├── cfa1c7e25219eddd4fd2eba7335d95d2245a76
+│   │   │   ├── e408cdfb2706e28c3bb5d799258a9494845014
+│   │   │   └── ea6e5afde6bd6c5fff5d0bbb2b017ce973592e
+│   │   ├── ad/
+│   │   │   ├── a7eaff85fb7b82938a0d92a4c0ae3d94ec5469
+│   │   │   └── cfc22258eba03cbbc49c4742c86d92a349e03c
+│   │   ├── ae/
+│   │   │   └── d21e045cb68c0c76d6e0c26411f4297b63752e
+│   │   ├── af/
+│   │   │   └── 7b4378a50081e8e9adda152afdfc33d66cc939
+│   │   ├── b0/
+│   │   │   ├── 1e9a99c7ba49e4510da6f84faa961de108345e
+│   │   │   ├── 9614e04b512aa54f882c6d8d20c3a48a871efd
+│   │   │   ├── c3526028538c2fef649886d41dad469449ad63
+│   │   │   └── feb414d95b11f277b18208abc7b3fbb434f727
+│   │   ├── b1/
+│   │   │   ├── 4e9d22d26d8837d055fe28b53d4694a41414d6
+│   │   │   └── d70b2c303e632f8582f91e527cc0e528fbc200
+│   │   ├── b2/
+│   │   │   ├── 19fb9bc97946cdf6abc211bd71157296aa4909
+│   │   │   ├── 7bbb242505a253cafbcba19957f6ef33769324
+│   │   │   └── 98edd428a361ca15957583b832a82d1af6eced
+│   │   ├── b3/
+│   │   │   ├── 2b69fc76586fc7bff89f3b1c7d05afdc5df2a8
+│   │   │   └── e114e5164fa741fa5f9889589c661e082e8353
+│   │   ├── b4/
+│   │   │   └── 38e77a9827bd3c730a86de2ef503bb0baf911f
+│   │   ├── b5/
+│   │   │   ├── 515c0b0e5108262864a3f0410736268abb05d6
+│   │   │   ├── 74a597daf309b383dc2dc2bd1e5362630e2531
+│   │   │   ├── 860eb188d988e80c4526b082748bc7a4b7dbf8
+│   │   │   └── c61c956711f981a41e95f7fcf0038436cfbb22
+│   │   ├── b6/
+│   │   │   ├── 0ed80685e335e60d5d2b49a0e349989204a93a
+│   │   │   └── 4298a0661dca4660eab948d9d30d889fa49427
+│   │   ├── b7/
+│   │   │   ├── 59e370c3d4633a93011e90597ef6a3ffdadc32
+│   │   │   └── 9d310939117a2509f4f2d59ef902967144070f
+│   │   ├── b9/
+│   │   │   └── a6d62f3f151f65692b6fb00b6e7299d320320b
+│   │   ├── ba/
+│   │   │   ├── 0aa60b074be18ef1bbdc2d489d3f6f65cc3f07
+│   │   │   └── 0ba6a9fa63d1a912b1323806e458aeca8296cb
+│   │   ├── bc/
+│   │   │   ├── 6231dbe858b7b5847666e899ee0591fdd63a03
+│   │   │   └── e62fdc7c95e3b5b2747d3c865e23d4b127ee6d
+│   │   ├── be/
+│   │   │   └── 0a98b790d5fc030567855f72b1d36fdf8d206a
+│   │   ├── bf/
+│   │   │   ├── 1ebfa7882b546604645fbef3a780c55f0660d7
+│   │   │   ├── 79c1bf518d3ca664478df239faec68874fad07
+│   │   │   └── 90342184459810430afe0c1deb098414d089fd
+│   │   ├── c0/
+│   │   │   └── 381a9fe2a270530241ed5d4838abe7c5c9aeb3
+│   │   ├── c1/
+│   │   │   └── 7cef2dbbed450426c3006b3581314b01e1e893
+│   │   ├── c2/
+│   │   │   ├── 9eb1a15ba81609f29337f8db51d91712409341
+│   │   │   └── d3a659117a26a67360b1f02e649cd98bb436b4
+│   │   ├── c3/
+│   │   │   └── 5e31d6a29f62921a8621944eb20ad162f5b2bb
+│   │   ├── c4/
+│   │   │   ├── 2804ac09056227cec04e75663fa75c8a673b2d
+│   │   │   ├── 95752b314f3e50e81039e0e1ab862a6dae7a6a
+│   │   │   └── bd6e23c598075e32ea2b5f3400b4828bee3329
+│   │   ├── c5/
+│   │   │   ├── a3deb15b3c3567c2b5e04e3adb9475839a3f51
+│   │   │   ├── fbdcf841d2fd799364b24539d81e508d8864fe
+│   │   │   └── ff315fe4d6267a78abcd3f46b9fea6a7482dba
+│   │   ├── c6/
+│   │   │   └── 4faff9954f4707e2459040d166a8a1db24d826
+│   │   ├── c7/
+│   │   │   └── 6b45558077b7f487ae1d1292a061542aa99c5f
+│   │   ├── c8/
+│   │   │   └── 93b809532d55587219376f8bcddf53416b0cd3
+│   │   ├── c9/
+│   │   │   ├── 2944700ec6ca0bb810929a706470ae0c188d12
+│   │   │   ├── 51d36eb51824650dd345609aee32fefd2b5477
+│   │   │   ├── 65bb8bbe671d12d59240b1a828af09aad9c7d8
+│   │   │   └── fd69b40a8187250cb0c0f257b6a8bd98ce6876
+│   │   ├── ca/
+│   │   │   ├── 28c6c6eb4687e4207b83c9d2f871fe7dae1dd2
+│   │   │   ├── 5f6ea5e3bba6161f8e3430db8a6dd2047a8be0
+│   │   │   └── b2f3a41670512e16174dc685b89b449bec786c
+│   │   ├── cb/
+│   │   │   └── 32e08f3e89d73de3bea607442d0ad46a4d3346
+│   │   ├── cc/
+│   │   │   ├── 34ae044972cd7fa653d2cd20c6b721fc000ccb
+│   │   │   ├── 4895f74527ea556c3f9093e769d34a3129252f
+│   │   │   └── 82d0805f03c293c9ff95c7fc7f3c7b2c887e9a
+│   │   ├── cd/
+│   │   │   └── 30c5fc708f7755fcb8c0e787409ff06c07043f
+│   │   ├── ce/
+│   │   │   └── 20e849b2c29bfd165ca86904490b1870119cff
+│   │   ├── d0/
+│   │   │   ├── 1a0ef2f7ffeb30b856a70a7daedf47d9b6b31b
+│   │   │   └── 826400f70cc38cb1400b4974e64adb4e2ef932
+│   │   ├── d1/
+│   │   │   ├── 7d28898f72973bfa97ff6ddfedaf45124e9345
+│   │   │   └── f62539fd96b38a9db3e6979832c000fe13b15e
+│   │   ├── d2/
+│   │   │   └── 6f3735410891e77fd8a06861a9ce8bad6c07ad
+│   │   ├── d3/
+│   │   │   └── c4c526a3adf34b3f4310fdc61fa383e63cad66
+│   │   ├── d4/
+│   │   │   └── cb3325f3428b10f5a032923b6677822e86933f
+│   │   ├── d5/
+│   │   │   └── 9db22cda5135db64f5a5740a29041d2b7faac9
+│   │   ├── d6/
+│   │   │   ├── 2ab06e8a774bec15ec063e142eee0c95787bf4
+│   │   │   ├── 5236f59b2fbc105cf7666c9251ff434f7c3b9d
+│   │   │   └── b7ef32c8478a48c3994dcadc86837f4371184d
+│   │   ├── d7/
+│   │   │   ├── 1f0b6769964a104ae4b9c445a3b713b9997cf9
+│   │   │   ├── 2ca9f7425a11b1bffe538f542f8f5765b262a8
+│   │   │   └── 6ec9e1cc812b80e2931eb7523c6c866d763142
+│   │   ├── d8/
+│   │   │   └── 2194ce2f66e8754a287b00aedea4e033c6ebdf
+│   │   ├── d9/
+│   │   │   ├── 49d5fd29e98b0d166a9dc6fb084b589c4c2371
+│   │   │   └── 5e7a50deea5a0820487cdb0a0c5fe8c8492d43
+│   │   ├── da/
+│   │   │   └── 1b12d81bc5ec6b19d854fdd400bcdb65e2170e
+│   │   ├── db/
+│   │   │   ├── 307325e10d966cefd87428b8c9a49521a4865f
+│   │   │   └── 526840f995fad80a21d0479778a5c43608784e
+│   │   ├── dc/
+│   │   │   └── d391bdf3ddfa147962b64f3e974bd80033c458
+│   │   ├── dd/
+│   │   │   ├── 06da0f0b490d7bf6625fbe52db2dbaf2de3924
+│   │   │   ├── bfb523bf96a4e0f1b3e01a783b07eb7a2517c7
+│   │   │   └── cc09f6455eda1c451330e7931479425aa37fe7
+│   │   ├── de/
+│   │   │   └── 0d46f58d545f9ac069c08320d22d0550913986
+│   │   ├── df/
+│   │   │   └── 70152f7dc99a985b705ae0f225533467d4ba45
+│   │   ├── e0/
+│   │   │   ├── 8239f9e7be05c2064747aa9807d9db65e5b812
+│   │   │   ├── e1d387e2cae39db07cfa2cba86e080e325e22e
+│   │   │   └── f8ce1d309aa4025aad0034ed2fb1fb593f706c
+│   │   ├── e1/
+│   │   │   └── 7bed81e1fc3b7a5c065e2a2ce57019fb041fb3
+│   │   ├── e2/
+│   │   │   ├── d9c6c528e7d388b305446c9dfb8ea6ce0d3efe
+│   │   │   └── e8b8ea98cf1dfa40049016fbca5f0d0b88b064
+│   │   ├── e3/
+│   │   │   └── 8da9c0a5b28adbe1ff581f597344a411af8daf
+│   │   ├── e4/
+│   │   │   └── 142cd454e900da03ff85e330f340eca318ce00
+│   │   ├── e6/
+│   │   │   └── 9de29bb2d1d6434b8b29ae775ad8c2e48c5391
+│   │   ├── e8/
+│   │   │   ├── 368bd22a9771696ef87574dc25914eb2c0a39d
+│   │   │   ├── 71cac16919cd500b2861341a0b8c8e55d36411
+│   │   │   └── 9516753070e9da67ccfe2dc9a3fe3f4ce17e09
+│   │   ├── ea/
+│   │   │   ├── 4e87d294176ca38fd4aa630715afaaa2c1e2e9
+│   │   │   ├── ca1accca55cb91af51fa37b1f78ee568cfd0b8
+│   │   │   └── f811d1b4688b825c2c2561db4f1750ea46d921
+│   │   ├── eb/
+│   │   │   ├── 0536286f3081c6c0646817037faf5446e3547d
+│   │   │   ├── 0e7216d36799aedaefe8eb8e87714115209e4d
+│   │   │   └── 6eced2f8ae92f0b515a2b871419ea155808967
+│   │   ├── ed/
+│   │   │   ├── 5d8e044e5eb28b8129c9a0fa6929ef0d6d1736
+│   │   │   ├── 8983de36ebadc568295e44fcbf5496b18d938e
+│   │   │   └── eeb4a69bdb2497172837b92d0bb0759dc1a9a0
+│   │   ├── ee/
+│   │   │   ├── 0785bfa1b23ef33dbe13dab42887b873773148
+│   │   │   ├── 3cb6facd7f33c1c5e2a2943915c1c1a203b1f0
+│   │   │   ├── 4e15c5e758d43865deaab286febcf9609fde76
+│   │   │   └── 8f07e993802c29e166435e55e302ebfff1c12b
+│   │   ├── ef/
+│   │   │   ├── 54a8c08ebd4dc116acad58770e3bc23d15be88
+│   │   │   └── f6a48fbe606d682831c40a77ac0762d34e0e04
+│   │   ├── f0/
+│   │   │   └── 8a0ab337992b9856073a432bdc14fc7e07b8e7
+│   │   ├── f1/
+│   │   │   └── 81e651a2e0d4a35f47ed3bdfaf2e04a3b57809
+│   │   ├── f3/
+│   │   │   └── 985c10af2bed6f8475b50f000f1c537f8cc57e
+│   │   ├── f6/
+│   │   │   ├── 0625bb5793bdfb598831a8143a373842ea7644
+│   │   │   ├── 0ed011ff47a1699966110d5306e16d11558ca5
+│   │   │   ├── 33b549ead8b31bf3df7f92701dc9b2c0ae3b4b
+│   │   │   ├── 4fa9ba79891e709d812c99dcc4440ed237993d
+│   │   │   ├── bd54fc9fe3f0f966a4a891c50c68fc8ae1b231
+│   │   │   └── fb2a47ebddffe363c123a6b7a8151ad73dd960
+│   │   ├── f7/
+│   │   │   └── c1fdca31cd33f37c6807e6f8e23d4397ca6bf8
+│   │   ├── f8/
+│   │   │   ├── 0902e72c3d135ac47e95d7d350331a5549ed89
+│   │   │   └── 2db5cf29b483f0a08fc99c999c45cc159dfe88
+│   │   ├── f9/
+│   │   │   └── ceb58c689fe7af96ea3ca6a70cf33a747796b2
+│   │   ├── fa/
+│   │   │   └── 02d4ae23e340e0859626a66773bee5265c3e73
+│   │   ├── fb/
+│   │   │   ├── 1512df4ae4889c617487e5ba3466cbef6b8bd0
+│   │   │   └── 669862dc5779f8416dbd75baf8bba6f43553c9
+│   │   ├── fc/
+│   │   │   ├── 4c1136b9e44e5edf01654bde671fb0beee2a72
+│   │   │   ├── 75f3215670b3d04a859920433320c9b1f71e10
+│   │   │   ├── 981726597d1d3c54a15a0dddf921dfba406def
+│   │   │   └── b21d396d657f597ef8b6729f73d89b0a871c9b
+│   │   ├── fd/
+│   │   │   └── 7b5a508174a3ea7ebe42759968d3bfb5b3b771
+│   │   ├── fe/
+│   │   │   ├── 1ffc2ff1abc1c23522418994879623c5647859
+│   │   │   ├── 87cb70b07c3f04fc55cd2c117ff5903db34268
+│   │   │   └── db287fece8049b6bd243804b133e3af7a43f4c
+│   │   ├── ff/
+│   │   │   ├── 2322193b2f9fe5b7a3bc48b6b07fc9fbea621c
+│   │   │   ├── 55a347b0014c60850a44f5b6a0fe3645ddc6a2
+│   │   │   ├── 85721e25d7f6c662352ffb861d52798bbf27f2
+│   │   │   └── 8f3a2064dda3880d097c25bc2d530747877293
+│   │   ├── info/
+│   │   └── pack/
 │   ├── packed-refs
 │   └── refs/
 │       ├── heads/
@@ -2971,6 +1216,74 @@ document.addEventListener("DOMContentLoaded", () => {
 │   ├── console.php
 │   └── web.php
 ├── script.sh*
+├── storage/
+│   ├── app/
+│   │   ├── .gitignore
+│   │   ├── private/
+│   │   │   └── .gitignore
+│   │   └── public/
+│   │       └── .gitignore
+│   ├── framework/
+│   │   ├── cache/
+│   │   │   ├── data/
+│   │   │   │   └── .gitignore
+│   │   │   └── .gitignore
+│   │   ├── .gitignore
+│   │   ├── sessions/
+│   │   │   └── .gitignore
+│   │   ├── testing/
+│   │   │   └── .gitignore
+│   │   └── views/
+│   │       ├── 05b63f7e7164d8adee50252122bf5d6a.php
+│   │       ├── 1225128b9942e9747649c8d3c0c30da4.php
+│   │       ├── 20abb8d3e6577477e10b7893c7383d73.php
+│   │       ├── 304e8a88308e3d601782a647f97c9bf7.php
+│   │       ├── 34422d405f9181d2dd82f1985eaa25c3.php
+│   │       ├── 346368a7a06cbd0cca81356546f7a148.php
+│   │       ├── 381f2c3a6e9b3f157380fb78914dc6d9.php
+│   │       ├── 458a878c3d157e704ed04654c70f26b8.php
+│   │       ├── 473bb602995706263f1e1b6331433881.php
+│   │       ├── 4925b6c9d4dc6feee9d72e05059d76f7.php
+│   │       ├── 4b100b4069290e742f8b62f1591dd4eb.php
+│   │       ├── 577dff3b2987cb45994f49750e705bfc.php
+│   │       ├── 5b251b016b7e1e533e688275ba075785.php
+│   │       ├── 65ad963fa9e43ab356f286494d695eeb.php
+│   │       ├── 6e9b2469f5ddb858ca3e1421dda16d34.php
+│   │       ├── 734b1c40571844677036625f1d24094e.php
+│   │       ├── 73a7f224f39bde00e4c811b22a85e60b.php
+│   │       ├── 761dabe0150e745bc976a153fd000f5e.php
+│   │       ├── 770388724f066df56c46bfc365f3136a.php
+│   │       ├── 7c7fdcd77fc13c74635cf503857a9958.php
+│   │       ├── 7ee700dad1e0709a8e67f838c91a4e44.php
+│   │       ├── 813bd6574d03f96b5297ba701af24a1b.php
+│   │       ├── 835ff40a5298a8460b3d630c5d1d6f9f.php
+│   │       ├── 8a4a3cc4af2fdf58c7bad82b39459147.php
+│   │       ├── 8c6113f3506c02d0fbbf3c16157d2b3f.php
+│   │       ├── 8ca7c09b36281a4485fb0f785a52af40.php
+│   │       ├── 94e21b278dd5a5b596397a9fbe109be5.php
+│   │       ├── 95a7ed10d00e03e4c64feef1b46cfbe4.php
+│   │       ├── aee7882d7951ef0d9115823fe36458d9.php
+│   │       ├── b466ba8301f48a07d46fa56976a967e3.php
+│   │       ├── b6b9ed180831051b0c3502b243471bd6.php
+│   │       ├── b8a45a10d18575a95fc987f9d3ed0adb.php
+│   │       ├── bd6ed375b9eb2baf18f2c652dbfdc7e6.php
+│   │       ├── be42168b80927b2010b4c43a4f9d56b7.php
+│   │       ├── beb2969c794c9bcf4ee172763a2cbce1.php
+│   │       ├── c12eed847e84d2fc1f483f32192149ad.php
+│   │       ├── c256d38a48eabe3b5280795c84745f9f.php
+│   │       ├── c5191f3380fcaa3c50595859770c6086.php
+│   │       ├── c857eccdd43bf2150c61673ca5abd03c.php
+│   │       ├── cd1d84e10a6c5b2a2b8af0e5e4c0d59b.php
+│   │       ├── d3c3f8a37686c18a22de68d1bb306f00.php
+│   │       ├── d400e25c49c1480187e8800980d73bec.php
+│   │       ├── d6c954eaf7cbe92fe0eb63a3327d0232.php
+│   │       ├── d735e491017bbfe0378f5139afb1e0df.php
+│   │       ├── e9d6e378bf3af5d5268ef745081a4322.php
+│   │       ├── ea11d16690b2d42aa42c59a738b5c799.php
+│   │       └── .gitignore
+│   └── logs/
+│       ├── .gitignore
+│       └── laravel.log
 ├── tests/
 │   ├── Feature/
 │   │   ├── Auth/
@@ -2987,4 +1300,4 @@ document.addEventListener("DOMContentLoaded", () => {
 │       └── ExampleTest.php
 └── users.txt
 
-58 directories, 166 files
+282 directories, 654 files
