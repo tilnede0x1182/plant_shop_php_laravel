@@ -1473,7 +1473,8 @@ $width = match ($width) {
 
             <div class="d-flex gap-2 flex-wrap mb-3">
                 <button class="btn btn-success rounded-3"
-                    onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }})">Ajouter au
+                    onclick="window.Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }})">Ajouter
+                    au
                     panier</button>
                 @auth
                     @if (Auth::user()->admin)
@@ -1517,8 +1518,8 @@ $width = match ($width) {
                             @endauth
                         </p>
                         <button class="btn btn-success w-100 rounded-3"
-                            onclick="Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }}, {{ $plant->stock }})">Ajouter
-                            au panier</button>
+                            onclick="window.Cart.add({{ $plant->id }}, '{{ addslashes($plant->name) }}', {{ $plant->price }}, {{ $plant->stock }})">
+                            Ajouter au panier</button>
                     </div>
                 </div>
             </div>
@@ -1570,18 +1571,20 @@ $width = match ($width) {
             <button class="btn btn-success w-100 rounded-3">Confirmer la commande</button>
         </form>
     @else
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                @if (session('success'))
-                    // console.log("Commande réussie : vidage du panier.");
-                    if (typeof Cart !== "undefined") Cart.clear();
+        @if (session('success'))
+            <div id="order-success" data-clear-cart></div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
                     window.location.href = "{{ route('orders.index') }}";
-                @elseif (session('error'))
-                    // console.error("Erreur détectée : redirection vers le panier.");
+                });
+            </script>
+        @elseif (session('error'))
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
                     window.location.href = "{{ route('carts.index') }}";
-                @endif
-            });
-        </script>
+                });
+            </script>
+        @endif
     @endif
 @endsection
 
@@ -2620,6 +2623,13 @@ class Cart {
     ) {
         const container = document.getElementById(containerId);
         const input = document.getElementById(inputId);
+        if (
+            !container ||
+            !input ||
+            document.querySelector(".alert-success") ||
+            document.querySelector(".alert-danger")
+        )
+            return;
         const cart = this.get();
 
         if (
@@ -2727,20 +2737,16 @@ function applyStockAdjustmentFromAlert() {
         console.error("Erreur ajustement stock :", e);
     }
 }
-// Initialisation
-window.Cart = new Cart();
 
 document.addEventListener("DOMContentLoaded", () => {
-    if (typeof window.Cart.add === "function") {
-        console.log("Cart.add is accessible.");
-    } else {
-        console.error("Cart.add is NOT accessible.");
+    window.Cart = new Cart();
+    if (document.querySelector("[data-clear-cart]")) {
+        window.Cart.clear();
     }
     window.Cart.updateNavbarCount();
     window.Cart.render();
     window.Cart.renderOrderReview();
     applyStockAdjustmentFromAlert();
-    console.log("Cart is loaded:", window.Cart);
 });
 
 

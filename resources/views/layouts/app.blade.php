@@ -4,8 +4,9 @@
 <head>
     <meta charset="utf-8">
     <title>Plant Shop</title>
-    <!-- Bootstrap CSS -->
+    <!-- Bootstrap CSS + JS bundle -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
     <!-- Styles personnalisés -->
     <link href="{{ asset('css/orange.css') }}" rel="stylesheet">
 </head>
