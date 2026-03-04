@@ -9,6 +9,11 @@ class Plant extends Model
 {
     protected $fillable = ['name', 'price', 'description', 'stock'];
 
+    /**
+     * Relation : items de commande contenant cette plante.
+     *
+     * @return HasMany
+     */
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);

@@ -48,6 +48,11 @@ class User extends Authenticatable
 		];
 	}
 
+	/**
+	 * Relation : commandes de l'utilisateur.
+	 *
+	 * @return HasMany
+	 */
 	public function orders(): HasMany
 	{
 		return $this->hasMany(Order::class);

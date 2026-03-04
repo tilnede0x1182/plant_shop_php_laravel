@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\DB;
 
 class OrdersController extends Controller
 {
+	/**
+	 * Affiche la liste des commandes de l'utilisateur.
+	 *
+	 * @return \Illuminate\View\View
+	 */
 	public function index()
 	{
 		$orders = Auth::user()->orders()->with('orderItems.plant')->get()->each(function ($order) {
@@ -20,11 +25,22 @@ class OrdersController extends Controller
 		return view('orders.index', compact('orders'));
 	}
 
+	/**
+	 * Affiche le formulaire de création de commande.
+	 *
+	 * @return \Illuminate\View\View
+	 */
 	public function create()
 	{
 		return view('orders.new');
 	}
 
+	/**
+	 * Enregistre une nouvelle commande.
+	 *
+	 * @param Request $request Requête HTTP contenant les items
+	 * @return \Illuminate\Http\RedirectResponse
+	 */
 	public function store(Request $request)
 	{
 		$items = json_decode($request->input('items'), true);

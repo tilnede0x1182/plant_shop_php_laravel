@@ -6,6 +6,11 @@ use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
+    /**
+     * Affiche le panier de l'utilisateur.
+     *
+     * @return \Illuminate\View\View
+     */
     public function index()
     {
         return view('carts.index');
