@@ -7234,6 +7234,7 @@ require __DIR__.'/auth.php';
 │   │   └── 2025_05_02_190618_create_sessions_table.php
 │   └── seeders/
 │       └── DatabaseSeeder.php
+├── dump.rdb
 ├── .editorconfig
 ├── .env
 ├── .env.example
@@ -7383,4 +7384,4 @@ require __DIR__.'/auth.php';
 │       └── ExampleTest.php
 └── users.txt
 
-58 directories, 164 files
+58 directories, 165 files
