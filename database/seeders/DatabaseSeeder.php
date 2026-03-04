@@ -40,6 +40,11 @@ class DatabaseSeeder extends Seeder
 		"Hosta (Hosta plantaginea)", "Lierre (Hedera helix)", "Mimosa (Acacia dealbata)"
 	];
 
+	/**
+	 * Execute le seeding de la base de donnees.
+	 *
+	 * @return void
+	 */
 	public function run(): void
 	{
 		$this->resetDatabase();
@@ -47,6 +52,11 @@ class DatabaseSeeder extends Seeder
 		$this->seedPlants();
 	}
 
+	/**
+	 * Reinitialise la base de donnees.
+	 *
+	 * @return void
+	 */
 	private function resetDatabase(): void
 	{
 		DB::statement('SET CONSTRAINTS ALL DEFERRED;');
@@ -57,6 +67,11 @@ class DatabaseSeeder extends Seeder
 		DB::statement('SET CONSTRAINTS ALL IMMEDIATE;');
 	}
 
+	/**
+	 * Cree les utilisateurs de test.
+	 *
+	 * @return void
+	 */
 	private function seedUsers(): void
 	{
 		$faker = Factory::create('fr_FR');
@@ -98,6 +113,11 @@ class DatabaseSeeder extends Seeder
 		return $noms[$iterator % $taille];
 	}
 
+	/**
+	 * Cree les plantes de test.
+	 *
+	 * @return void
+	 */
 	private function seedPlants(): void
 	{
 		$faker = Factory::create('fr_FR');
