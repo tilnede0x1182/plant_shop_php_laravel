@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
 
+/**
+ * Contrôleur pour l inscription des utilisateurs.
+ */
 class RegisteredUserController extends Controller
 {
 	/**
@@ -25,7 +28,9 @@ class RegisteredUserController extends Controller
 	/**
 	 * Handle an incoming registration request.
 	 *
+	 * @param Request $request Requête HTTP contenant les données d'inscription
 	 * @throws \Illuminate\Validation\ValidationException
+	 * @return RedirectResponse
 	 */
 	public function store(Request $request): RedirectResponse
 	{

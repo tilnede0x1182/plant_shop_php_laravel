@@ -13,10 +13,16 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
 
+/**
+ * Contrôleur pour la réinitialisation du mot de passe.
+ */
 class NewPasswordController extends Controller
 {
     /**
      * Display the password reset view.
+     *
+     * @param Request $request Requête HTTP
+     * @return View
      */
     public function create(Request $request): View
     {
@@ -26,7 +32,9 @@ class NewPasswordController extends Controller
     /**
      * Handle an incoming new password request.
      *
+     * @param Request $request Requête HTTP contenant le nouveau mot de passe
      * @throws \Illuminate\Validation\ValidationException
+     * @return RedirectResponse
      */
     public function store(Request $request): RedirectResponse
     {

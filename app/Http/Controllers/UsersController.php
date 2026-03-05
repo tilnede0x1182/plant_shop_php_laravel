@@ -6,6 +6,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 
+/**
+ * Contrôleur pour la gestion des utilisateurs (profil personnel).
+ */
 class UsersController extends Controller
 {
     /**

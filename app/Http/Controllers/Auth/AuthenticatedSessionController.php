@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
+/**
+ * Contrôleur pour la gestion des sessions utilisateur (connexion/déconnexion).
+ */
 class AuthenticatedSessionController extends Controller
 {
     /**
@@ -21,6 +24,9 @@ class AuthenticatedSessionController extends Controller
 
     /**
      * Handle an incoming authentication request.
+     *
+     * @param LoginRequest $request Requete de connexion
+     * @return RedirectResponse
      */
     public function store(LoginRequest $request): RedirectResponse
     {
@@ -33,6 +39,9 @@ class AuthenticatedSessionController extends Controller
 
     /**
      * Destroy an authenticated session.
+     *
+     * @param Request $request Requete HTTP
+     * @return RedirectResponse
      */
     public function destroy(Request $request): RedirectResponse
     {

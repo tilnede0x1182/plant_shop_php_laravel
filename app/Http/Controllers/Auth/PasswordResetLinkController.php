@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\View\View;
 
+/**
+ * Contrôleur pour l envoi du lien de réinitialisation.
+ */
 class PasswordResetLinkController extends Controller
 {
     /**
@@ -21,7 +24,9 @@ class PasswordResetLinkController extends Controller
     /**
      * Handle an incoming password reset link request.
      *
+     * @param Request $request Requête HTTP contenant l'email
      * @throws \Illuminate\Validation\ValidationException
+     * @return RedirectResponse
      */
     public function store(Request $request): RedirectResponse
     {

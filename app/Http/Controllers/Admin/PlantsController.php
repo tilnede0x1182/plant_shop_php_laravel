@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Plant;
 use Illuminate\Http\Request;
 
+/**
+ * Contrôleur admin pour la gestion des plantes (CRUD).
+ */
 class PlantsController extends Controller
 {
 	/**

@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
+/**
+ * Contrôleur pour la confirmation du mot de passe.
+ */
 class ConfirmablePasswordController extends Controller
 {
     /**
@@ -21,6 +24,9 @@ class ConfirmablePasswordController extends Controller
 
     /**
      * Confirm the user's password.
+     *
+     * @param Request $request Requête HTTP
+     * @return RedirectResponse
      */
     public function store(Request $request): RedirectResponse
     {

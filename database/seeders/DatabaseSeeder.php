@@ -12,7 +12,7 @@ use App\Models\Plant;
 use App\Models\Order;
 use App\Models\OrderItem;
 
-class DatabaseSeeder extends Seeder
+/**\n * Seeder principal pour initialiser la base de données de test.\n */\nclass DatabaseSeeder extends Seeder
 {
 	// Variables globales pour la seed
 	const NB_ADMINS = 3;  // 👤 Nombre d'administrateurs à créer

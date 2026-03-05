@@ -8,6 +8,9 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
 
+/**
+ * Modèle utilisateur personnalisé.
+ */
 class User extends Authenticatable
 {
 	/** @use HasFactory<\Database\Factories\UserFactory> */

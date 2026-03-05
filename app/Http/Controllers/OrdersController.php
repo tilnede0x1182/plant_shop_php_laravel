@@ -10,6 +10,9 @@ use App\Models\OrderItem;
 use App\Models\Plant;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Contrôleur pour la gestion des commandes utilisateur.
+ */
 class OrdersController extends Controller
 {
 	/**

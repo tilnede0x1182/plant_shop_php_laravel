@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Plant;
 use Illuminate\Http\Request;
 
+/**
+ * Contrôleur pour l'affichage des plantes (côté client).
+ */
 class PlantsController extends Controller
 {
     /**
